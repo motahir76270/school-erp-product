@@ -1,0 +1,451 @@
+// relations.ts
+import { relations } from 'drizzle-orm';
+import {
+  users,
+  students,
+  teachers,
+  classes,
+  sections,
+  subjects,
+  classSubjects,
+  attendance,
+  attendanceLogs,
+  feeTypes,
+  studentFees,
+  feePayments,
+  feePenalties,
+  notices,
+  holidays,
+  timetable,
+  mcqTests,
+  mcqQuestions,
+  mcqAnswers,
+  mcqTestResults,
+  exams,
+  marks,
+  results,
+  assignments,
+  submissions,
+  libraryBooks,
+  bookIssues,
+  events,
+  notifications,
+  settings,
+  auditLogs,
+  teacherSalaries,
+  permission,
+  paymentGateway,
+} from './users.js';
+
+// User relations
+export const usersRelations = relations(users, ({ many }) => ({
+  notifications: many(notifications),
+  auditLogs: many(auditLogs),
+}));
+
+// Student relations (FIXED: Removed parent reference)
+export const studentsRelations = relations(students, ({ one, many }) => ({
+  user: one(users, {
+    fields: [students.userId],
+    references: [users.id],
+  }),
+  class: one(classes, {
+    fields: [students.classId],
+    references: [classes.id],
+  }),
+  section: one(sections, {
+    fields: [students.sectionId],
+    references: [sections.id],
+  }),
+  attendanceLogs: many(attendanceLogs),
+  studentFees: many(studentFees),
+  mcqAnswers: many(mcqAnswers),
+  mcqTestResults: many(mcqTestResults),
+  marks: many(marks),
+  results: many(results),
+  submissions: many(submissions),
+  bookIssues: many(bookIssues),
+}));
+
+// Teacher relations
+export const teachersRelations = relations(teachers, ({ one, many }) => ({
+  user: one(users, {
+    fields: [teachers.userId],
+    references: [users.id],
+  }),
+  sections: many(sections),
+  classSubjects: many(classSubjects),
+  attendance: many(attendance),
+  mcqTests: many(mcqTests),
+  marks: many(marks),
+  assignments: many(assignments),
+  bookIssues: many(bookIssues),
+  salaries: many(teacherSalaries),
+  permissions: one(permission, {
+    fields: [teachers.id],
+    references: [permission.teacherId],
+  }),
+}));
+
+// Class relations
+export const classesRelations = relations(classes, ({ one, many }) => ({
+  classTeacher: one(teachers, {
+    fields: [classes.classTeacherId],
+    references: [teachers.id],
+  }),
+  sections: many(sections),
+  students: many(students),
+  classSubjects: many(classSubjects),
+  attendance: many(attendance),
+  timetable: many(timetable),
+  mcqTests: many(mcqTests),
+  exams: many(exams),
+  results: many(results),
+  assignments: many(assignments),
+}));
+
+// Section relations
+export const sectionsRelations = relations(sections, ({ one, many }) => ({
+  class: one(classes, {
+    fields: [sections.classId],
+    references: [classes.id],
+  }),
+  teacher: one(teachers, {
+    fields: [sections.teacherId],
+    references: [teachers.id],
+  }),
+  students: many(students),
+  attendance: many(attendance),
+  timetable: many(timetable),
+  assignments: many(assignments),
+}));
+
+// Subject relations
+export const subjectsRelations = relations(subjects, ({ many }) => ({
+  classSubjects: many(classSubjects),
+  timetable: many(timetable),
+  mcqTests: many(mcqTests),
+  exams: many(exams),
+  marks: many(marks),
+  assignments: many(assignments),
+}));
+
+// Class Subject relations
+export const classSubjectsRelations = relations(classSubjects, ({ one }) => ({
+  class: one(classes, {
+    fields: [classSubjects.classId],
+    references: [classes.id],
+  }),
+  subject: one(subjects, {
+    fields: [classSubjects.subjectId],
+    references: [subjects.id],
+  }),
+  teacher: one(teachers, {
+    fields: [classSubjects.teacherId],
+    references: [teachers.id],
+  }),
+}));
+
+// Attendance relations
+export const attendanceRelations = relations(attendance, ({ one, many }) => ({
+  class: one(classes, {
+    fields: [attendance.classId],
+    references: [classes.id],
+  }),
+  section: one(sections, {
+    fields: [attendance.sectionId],
+    references: [sections.id],
+  }),
+  logs: many(attendanceLogs),
+}));
+
+// Attendance Log relations
+export const attendanceLogsRelations = relations(attendanceLogs, ({ one }) => ({
+  attendance: one(attendance, {
+    fields: [attendanceLogs.attendanceId],
+    references: [attendance.id],
+  }),
+  student: one(students, {
+    fields: [attendanceLogs.studentId],
+    references: [students.id],
+  }),
+}));
+
+// Fee Type relations
+export const feeTypesRelations = relations(feeTypes, ({ many }) => ({
+  studentFees: many(studentFees),
+}));
+
+// Student Fee relations
+export const studentFeesRelations = relations(studentFees, ({ one, many }) => ({
+  student: one(students, {
+    fields: [studentFees.studentId],
+    references: [students.id],
+  }),
+  feeType: one(feeTypes, {
+    fields: [studentFees.feeTypeId],
+    references: [feeTypes.id],
+  }),
+  payments: many(feePayments),
+  penalties: many(feePenalties),
+}));
+
+// Fee Payment relations
+export const feePaymentsRelations = relations(feePayments, ({ one }) => ({
+  studentFee: one(studentFees, {
+    fields: [feePayments.studentFeeId],
+    references: [studentFees.id],
+  }),
+}));
+
+// Fee Penalty relations
+export const feePenaltiesRelations = relations(feePenalties, ({ one }) => ({
+  studentFee: one(studentFees, {
+    fields: [feePenalties.studentFeeId],
+    references: [studentFees.id],
+  }),
+}));
+
+// Notice relations
+export const noticesRelations = relations(notices, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [notices.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Holiday relations
+export const holidaysRelations = relations(holidays, ({}) => ({}));
+
+// Timetable relations
+export const timetableRelations = relations(timetable, ({ one }) => ({
+  class: one(classes, {
+    fields: [timetable.classId],
+    references: [classes.id],
+  }),
+  section: one(sections, {
+    fields: [timetable.sectionId],
+    references: [sections.id],
+  }),
+  subject: one(subjects, {
+    fields: [timetable.subjectId],
+    references: [subjects.id],
+  }),
+  teacher: one(teachers, {
+    fields: [timetable.teacherId],
+    references: [teachers.id],
+  }),
+}));
+
+// MCQ Test relations
+export const mcqTestsRelations = relations(mcqTests, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [mcqTests.subjectId],
+    references: [subjects.id],
+  }),
+  class: one(classes, {
+    fields: [mcqTests.classId],
+    references: [classes.id],
+  }),
+  createdBy: one(users, {
+    fields: [mcqTests.createdBy],
+    references: [users.id],
+  }),
+  questions: many(mcqQuestions),
+  answers: many(mcqAnswers),
+  results: many(mcqTestResults),
+}));
+
+// MCQ Question relations
+export const mcqQuestionsRelations = relations(mcqQuestions, ({ one }) => ({
+  test: one(mcqTests, {
+    fields: [mcqQuestions.testId],
+    references: [mcqTests.id],
+  }),
+}));
+
+// MCQ Answer relations
+export const mcqAnswersRelations = relations(mcqAnswers, ({ one }) => ({
+  test: one(mcqTests, {
+    fields: [mcqAnswers.testId],
+    references: [mcqTests.id],
+  }),
+  student: one(students, {
+    fields: [mcqAnswers.studentId],
+    references: [students.id],
+  }),
+  question: one(mcqQuestions, {
+    fields: [mcqAnswers.questionId],
+    references: [mcqQuestions.id],
+  }),
+}));
+
+// MCQ Test Results relations
+export const mcqTestResultsRelations = relations(mcqTestResults, ({ one }) => ({
+  test: one(mcqTests, {
+    fields: [mcqTestResults.testId],
+    references: [mcqTests.id],
+  }),
+  student: one(students, {
+    fields: [mcqTestResults.studentId],
+    references: [students.id],
+  }),
+}));
+
+// Exam relations
+export const examsRelations = relations(exams, ({ one, many }) => ({
+  class: one(classes, {
+    fields: [exams.classId],
+    references: [classes.id],
+  }),
+  subject: one(subjects, {
+    fields: [exams.subjectId],
+    references: [subjects.id],
+  }),
+  createdBy: one(users, {
+    fields: [exams.createdBy],
+    references: [users.id],
+  }),
+  marks: many(marks),
+}));
+
+// Marks relations
+export const marksRelations = relations(marks, ({ one }) => ({
+  exam: one(exams, {
+    fields: [marks.examId],
+    references: [exams.id],
+  }),
+  student: one(students, {
+    fields: [marks.studentId],
+    references: [students.id],
+  }),
+  subject: one(subjects, {
+    fields: [marks.subjectId],
+    references: [subjects.id],
+  }),
+  enteredBy: one(users, {
+    fields: [marks.enteredBy],
+    references: [users.id],
+  }),
+}));
+
+// Results relations
+export const resultsRelations = relations(results, ({ one }) => ({
+  student: one(students, {
+    fields: [results.studentId],
+    references: [students.id],
+  }),
+  class: one(classes, {
+    fields: [results.classId],
+    references: [classes.id],
+  }),
+}));
+
+// Assignment relations
+export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [assignments.subjectId],
+    references: [subjects.id],
+  }),
+  class: one(classes, {
+    fields: [assignments.classId],
+    references: [classes.id],
+  }),
+  section: one(sections, {
+    fields: [assignments.sectionId],
+    references: [sections.id],
+  }),
+  createdBy: one(users, {
+    fields: [assignments.createdBy],
+    references: [users.id],
+  }),
+  submissions: many(submissions),
+}));
+
+// Submission relations
+export const submissionsRelations = relations(submissions, ({ one }) => ({
+  assignment: one(assignments, {
+    fields: [submissions.assignmentId],
+    references: [assignments.id],
+  }),
+  student: one(students, {
+    fields: [submissions.studentId],
+    references: [students.id],
+  }),
+  evaluatedBy: one(users, {
+    fields: [submissions.evaluatedBy],
+    references: [users.id],
+  }),
+}));
+
+// Library Book relations
+export const libraryBooksRelations = relations(libraryBooks, ({ many }) => ({
+  issues: many(bookIssues),
+}));
+
+// Book Issue relations
+export const bookIssuesRelations = relations(bookIssues, ({ one }) => ({
+  book: one(libraryBooks, {
+    fields: [bookIssues.bookId],
+    references: [libraryBooks.id],
+  }),
+  issuedBy: one(users, {
+    fields: [bookIssues.issuedBy],
+    references: [users.id],
+  }),
+}));
+
+// Event relations
+export const eventsRelations = relations(events, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [events.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Notification relations
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
+// Settings relations
+export const settingsRelations = relations(settings, ({}) => ({}));
+
+// Audit Log relations
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+// Teacher Salary relations
+export const teacherSalariesRelations = relations(teacherSalaries, ({ one }) => ({
+  teacher: one(teachers, {
+    fields: [teacherSalaries.teacherId],
+    references: [teachers.id],
+  }),
+  generatedBy: one(users, {
+    fields: [teacherSalaries.generatedBy],
+    references: [users.id],
+  }),
+}));
+
+// Permission relations (NEW)
+export const permissionRelations = relations(permission, ({ one }) => ({
+  teacher: one(teachers, {
+    fields: [permission.teacherId],
+    references: [teachers.id],
+  }),
+}));
+
+// Payment Gateway relations (NEW)
+export const paymentGatewayRelations = relations(paymentGateway, ({ one }) => ({
+  user: one(users, {
+    fields: [paymentGateway.userId],
+    references: [users.id],
+  }),
+}));
