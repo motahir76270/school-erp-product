@@ -10,7 +10,7 @@ export default defineConfig({
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT),
     user: process.env.DB_USER,
-    password: undefined,
+    password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
   },
 });
