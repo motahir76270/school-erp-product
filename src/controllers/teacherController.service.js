@@ -1,5 +1,5 @@
 // src/controllers/teacherController.js
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/db.js";
 import { teachers } from "../db/schema/users.js";
@@ -378,29 +378,42 @@ export const updateTeacher = async (req, res) => {
 };
 
 // ==================== GET ALL TEACHERS ====================
+
 export const getAllTeachers = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const offset = parseInt(req.query.offset) || 0;
+    const id = req.user.id;
 
-    let query = db.select().from(teachers);
-    query = query.limit(limit).offset(offset);
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
 
-    const allTeachers = await query;
+    // Get teachers for the current page
+    const allTeachers = await db
+      .select()
+      .from(teachers)
+      .where(eq(teachers.userId, id))
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(teachers)
+      .where(eq(teachers.userId, id));
 
     return successResponse(
       res,
       {
         teachers: allTeachers,
         pagination: {
+          page,
           limit,
-          offset,
-          total: allTeachers.length,
-          hasMore: allTeachers.length === limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
       },
       "Teachers fetched successfully",
-      200,
+      200
     );
   } catch (error) {
     console.error("Get all teachers error:", error);

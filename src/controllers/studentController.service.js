@@ -9,11 +9,9 @@ import { generateQRCode, deleteQRCodeFile } from "../config/qrCode.js";
 
 // ==================== GENERATE DEFAULT USERNAME ====================
 const generateDefaultUsername = () => {
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000)
+  const random = 230 + Math.floor(Math.random() * 1000)
     .toString()
-    .padStart(3, "0");
-  return `STU-${timestamp}${random}`;
+  return `STU-${random}`;
 };
 
 // ==================== CREATE STUDENT ====================
@@ -92,6 +90,7 @@ export const createStudent = async (req, res) => {
         );
       }
     }
+
 
     // Generate username if not provided
     let finalUsername = username;
@@ -514,7 +513,7 @@ export const getStudentsByClassAndSection = async (req, res) => {
       .select()
       .from(students)
       .where(
-        and(eq(students.classId, classId), eq(students.sectionId, sectionId)),
+        and(eq(students.classId, classId), eq(students.sectionId, sectionId))
       );
 
 

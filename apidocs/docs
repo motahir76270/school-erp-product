@@ -1,0 +1,589 @@
+{
+  "info": {
+    "_postman_id": "a4ae35dc-ece3-40c7-96e2-bcf549392eda",
+    "name": "school_management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "56268075",
+    "_collection_link": "https://go.postman.co/collection/56268075-a4ae35dc-ece3-40c7-96e2-bcf549392eda?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "admin",
+      "item": [
+        {
+          "name": "class",
+          "item": [
+            {
+              "name": "create",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{AToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\":\"Class 4\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}classes",
+                  "host": [
+                    "{{url}}classes"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete class",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{AToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}classes/665d08bb-f612-419e-9747-3d411bfed9a5",
+                  "host": [
+                    "{{url}}classes"
+                  ],
+                  "path": [
+                    "665d08bb-f612-419e-9747-3d411bfed9a5"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "subject",
+          "item": []
+        },
+        {
+          "name": "sections",
+          "item": [
+            {
+              "name": "create",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{AToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\":\"A\",\n    \"classId\": \"665d08bb-f612-419e-9747-3d411bfed9a5\",\n    \"capacity\":30\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}classes/sections",
+                  "host": [
+                    "{{url}}classes"
+                  ],
+                  "path": [
+                    "sections"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getall",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{url}}classes/sections?classId=03068f17-08e1-4de8-b355-5c25e308ddc3",
+                  "host": [
+                    "{{url}}classes"
+                  ],
+                  "path": [
+                    "sections"
+                  ],
+                  "query": [
+                    {
+                      "key": "classId",
+                      "value": "03068f17-08e1-4de8-b355-5c25e308ddc3"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "register",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"mnu@gmail.com\",\n  \"password\": \"123456\",\n  \"role\": \"admin\",\n  \"firstName\": \"Monu\",\n  \"lastName\": \"Khan\",\n  \"phone\": \"9876543210\",\n  \"address\": \"123 Admin Street, Jaipur, Rajasthan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}auth/register",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\":\"tahir@gmail.com\",\n    \"password\":\"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}auth/login",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{url}}auth/user-delete",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "user-delete"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Monu\",\n  \"lastName\": \"Do\",\n  \"phone\": \"9876543210\",\n  \"address\": \"Delhi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}auth/user-update",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "user-update"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "fileupdate",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profileImage",
+                  "type": "file",
+                  "src": "/home/sher/Pictures/Screenshots/Screenshot from 2024-04-05 00-35-54.png"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{url}}auth/user-profile",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "user-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\":\"test@123\",\n    \"password\":\"test@123\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}auth/logout",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "admin login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\":\"monu@gmail.com\",\r\n    \"password\":\"123456\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}auth/login",
+              "host": [
+                "{{url}}auth"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "student",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{AToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rohit@gmail.com\",\n  \"name\": \"Rahul\",\n  \"phone\": \"9876543210\",\n  \"address\": \"123, MG Road, Jaipur, Rajasthan\",\n  \"rollNumber\": \"10A012\",\n  \"admissionNumber\": \"ADM2026442\",\n  \"classId\": \"8da6466d-ff9b-4f12-8614-4ed63db665ad\",\n  \"sectionId\": \"ffdf7d56-f96f-4280-9472-0c9c2c7fa905\",\n  \"dateOfBirth\": \"2010-05-15\",\n  \"gender\": \"Male\", \n  \"bloodGroup\": \"O+\",\n  \"religion\": \"Hindu\",\n  \"caste\": \"General\",\n  \"nationality\": \"Indian\",\n  \"aadharNumber\": \"123456789028\",\n  \"admissionDate\": \"2026-04-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}students/register",
+              "host": [
+                "{{url}}students"
+              ],
+              "path": [
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getAll",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{AToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}students/all",
+              "host": [
+                "{{url}}students"
+              ],
+              "path": [
+                "all"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "login",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\":\"rahul@gmail.com\",\n    \"password\":\"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}students/login",
+              "host": [
+                "{{url}}students"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "teacher",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{AToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "  {\n    \"id\": \"a1b2c3e4-e5f6-7890-abcd-123456789001\",\n    \"name\": \"Rahul\",\n    \"role\": \"teacher\",\n    \"email\":\"teach10@gmail.com\",\n    \"username\":\"teachjd7\",\n    \"password\": \"123456\",\n    \"employeeId\": \"EMP0055\",\n    \"qualification\": \"M.Sc Mathematics\",\n    \"experience\": 8,\n    \"specialization\": \"Mathematics\",\n    \"joiningDate\": \"2018-06-15\",\n    \"salary\": \"45000.00\"\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}teachers/register",
+              "host": [
+                "{{url}}teachers"
+              ],
+              "path": [
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\":\"teach1@gmail.com\",\n    \"password\":\"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}teachers/login",
+              "host": [
+                "{{url}}teachers"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get all",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{AToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "  {\n    \"id\": \"a1b2c3e4-e5f6-7890-abcd-123456789001\",\n    \"name\": \"Rahul\",\n    \"role\": \"teacher\",\n    \"email\":\"teach1@gmail.com\",\n    \"username\":\"teachjd\",\n    \"password\": \"123456\",\n    \"employeeId\": \"EMP001\",\n    \"qualification\": \"M.Sc Mathematics\",\n    \"experience\": 8,\n    \"specialization\": \"Mathematics\",\n    \"joiningDate\": \"2018-06-15\",\n    \"salary\": \"45000.00\"\n  }"
+            },
+            "url": {
+              "raw": "{{url}}teachers/all",
+              "host": [
+                "{{url}}teachers"
+              ],
+              "path": [
+                "all"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "url",
+      "value": "https://d86e595a-bcf0-42bc-bb01-b99e189b9e98.mock.pstmn.io"
+    }
+  ]
+}

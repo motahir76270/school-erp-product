@@ -186,12 +186,11 @@ export const getSectionsByClass = async (req, res) => {
     const sectionsData = await db
       .select()
       .from(sections)
-      .where(eq(sections.class_id, classId));
+      .where(eq(sections.classId, classId));
 
     return successResponse(
       res,
       {
-        class: existingClass,
         sections: sectionsData,
         totalSections: sectionsData.length,
       },
@@ -225,7 +224,7 @@ export const updateSection = async (req, res) => {
     }
 
     // If classId is being changed, check if new class exists
-    if (classId && classId !== existingSection.class_id) {
+    if (classId && classId !== existingSection.classId) {
       const [newClass] = await db
         .select()
         .from(classes)
@@ -240,7 +239,7 @@ export const updateSection = async (req, res) => {
       const existingSectionInNewClass = await db
         .select()
         .from(sections)
-        .where(eq(sections.class_id, classId))
+        .where(eq(sections.classId, classId))
         .where(eq(sections.name, name || existingSection.name))
         .limit(1);
 
