@@ -130,9 +130,9 @@ export const classSubjectsRelations = relations(classSubjects, ({ one }) => ({
     fields: [classSubjects.subjectId],
     references: [subjects.id],
   }),
-  teacher: one(teachers, {
-    fields: [classSubjects.teacherId],
-    references: [teachers.id],
+  teacher: one(users, {
+    fields: [classSubjects.userId],
+    references: [users.id],
   }),
 }));
 

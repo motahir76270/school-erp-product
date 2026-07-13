@@ -1,5 +1,5 @@
 
-import { eq } from "drizzle-orm";
+import { eq ,and, count} from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/db.js";
 import { subjects, classSubjects } from "../db/schema/users.js";
@@ -8,6 +8,7 @@ import { successResponse, errorResponse } from "../lib/response.js";
 // ==================== CREATE SUBJECT ====================
 export const createSubject = async (req, res) => {
   try {
+    const userId = req.user.id;
     const { name, code, type, maxMarks, passMarks } = req.body;
 
     // Validate required fields
@@ -42,6 +43,7 @@ export const createSubject = async (req, res) => {
     // Insert subject
     await db.insert(subjects).values({
       id: subjectId,
+      userId:userId,
       name: name,
       code: code,
       type: type || "theory",
@@ -74,40 +76,51 @@ export const createSubject = async (req, res) => {
 };
 
 // ==================== GET ALL SUBJECTS ====================
+
 export const getAllSubjects = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const offset = parseInt(req.query.offset) || 0;
-    const status = req.query.status || null;
-    const type = req.query.type || null;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
 
-    let query = db.select().from(subjects);
+    const status = req.query.status;
+    const type = req.query.type;
+
+    const conditions = [];
 
     if (status) {
-      query = query.where(eq(subjects.status, status));
+      conditions.push(eq(subjects.status, status));
     }
 
     if (type) {
-      query = query.where(eq(subjects.type, type));
+      conditions.push(eq(subjects.type, type));
     }
 
-    query = query.limit(limit).offset(offset);
+    let query = db.select().from(subjects);
+    let countQuery = db.select({ total: count() }).from(subjects);
 
-    const allSubjects = await query;
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+      countQuery = countQuery.where(and(...conditions));
+    }
+
+    const allSubjects = await query.limit(limit).offset(offset);
+
+    const [{ total }] = await countQuery;
 
     return successResponse(
       res,
       {
         subjects: allSubjects,
         pagination: {
+          page,
           limit,
-          offset,
-          total: allSubjects.length,
-          hasMore: allSubjects.length === limit,
+          total,
+          totalPages: Math.ceil(total / limit)
         },
       },
       "Subjects fetched successfully",
-      200,
+      200
     );
   } catch (error) {
     console.error("Get all subjects error:", error);
@@ -399,7 +412,7 @@ export const updateSubjectStatus = async (req, res) => {
 // ==================== ASSIGN SUBJECT TO CLASS ====================
 export const assignSubjectToClass = async (req, res) => {
   try {
-    const { subjectId, classId, teacherId } = req.body;
+    const { subjectId, classId, userId } = req.body;
 
     if (!subjectId || !classId) {
       return errorResponse(res, "subjectId and classId are required", 400);
@@ -440,7 +453,7 @@ export const assignSubjectToClass = async (req, res) => {
       id: assignmentId,
       subjectId: subjectId,
       classId: classId,
-      teacherId: teacherId || null,
+      userId: userId || null,
       status: "active",
     });
 
@@ -583,9 +596,8 @@ export const getSubjectTeachers = async (req, res) => {
       .where(eq(classSubjects.subjectId, subjectId))
       .where(eq(classSubjects.status, "active"));
 
-    // Get unique teachers
-    const teacherIds = [
-      ...new Set(assignments.map((a) => a.teacherId).filter((id) => id)),
+    const UsersIds = [
+      ...new Set(assignments.map((a) => a.userId).filter((id) => id)),
     ];
 
     // You would fetch teacher details here if you have a teachers table
@@ -616,7 +628,8 @@ export const getSubjectTeachers = async (req, res) => {
 // ==================== BULK ASSIGN SUBJECTS TO CLASS ====================
 export const bulkAssignSubjectsToClass = async (req, res) => {
   try {
-    const { classId, subjectIds, teacherIds } = req.body;
+    const userId = req.user.id;
+    const { classId, subjectIds } = req.body;
 
     if (
       !classId ||
@@ -636,7 +649,7 @@ export const bulkAssignSubjectsToClass = async (req, res) => {
 
     for (let i = 0; i < subjectIds.length; i++) {
       const subjectId = subjectIds[i];
-      const teacherId = teacherIds && teacherIds[i] ? teacherIds[i] : null;
+      const userId = teacherIds && userId[i] ? teacherIds[i] : null;
 
       try {
         // Check if subject exists
@@ -673,7 +686,7 @@ export const bulkAssignSubjectsToClass = async (req, res) => {
           id: assignmentId,
           subjectId: subjectId,
           classId: classId,
-          teacherId: teacherId,
+          userId: userId,
           status: "active",
         });
 

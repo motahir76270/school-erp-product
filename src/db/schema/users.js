@@ -97,6 +97,7 @@ export const sections = mysqlTable("sections", {
 // Subjects Table
 export const subjects = mysqlTable("subjects", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  userId:varchar('user_id', {length:40}).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   code: varchar("code", { length: 20 }).notNull().unique(),
   type: varchar("type", { length: 20 }).default("theory"), // theory, practical
@@ -112,7 +113,7 @@ export const classSubjects = mysqlTable("class_subjects", {
   id: varchar("id", { length: 36 }).primaryKey(),
   classId: varchar("class_id", { length: 36 }).notNull(),
   subjectId: varchar("subject_id", { length: 36 }).notNull(),
-  teacherId: varchar("teacher_id", { length: 36 }),
+  userId: varchar("user_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
