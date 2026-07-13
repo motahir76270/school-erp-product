@@ -1,0 +1,98 @@
+// src/routes/teacherRoutes.js
+import { Router } from "express";
+import {
+  createTeacher,
+  teacherLogin,
+  updateTeacher,
+  getAllTeachers,
+  getTeacherById,
+  getTeacherProfile,
+  updateTeacherProfile,
+  changeTeacherPassword,
+  resetTeacherPassword,
+  deleteTeacher,
+  hardDeleteTeacher,
+  updateTeacherStatus,
+  getTeacherQRCode,
+  regenerateTeacherQRCode,
+  scanTeacherQRCode,
+} from "../controllers/teacherController.service.js";
+import {
+  authMiddleware,
+  roleMiddleware,
+} from "../middleware/authMiddleware.js";
+import { single } from "../config/uploadFile.js";
+
+
+const teacherRouter = Router();
+
+// ==================== PUBLIC ROUTES ====================
+teacherRouter.post("/login", teacherLogin);
+
+// ==================== QR CODE ROUTES ====================
+teacherRouter.get("/qr-code", authMiddleware, getTeacherQRCode);
+teacherRouter.post(
+  "/qr-code/regenerate",
+  authMiddleware,
+  regenerateTeacherQRCode,
+);
+teacherRouter.get(
+  "/qr-scan/:teacherId",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  scanTeacherQRCode,
+);
+
+// ==================== PROTECTED TEACHER ROUTES ====================
+teacherRouter.get("/profile", authMiddleware, getTeacherProfile);
+teacherRouter.put("/update", authMiddleware, updateTeacher);
+teacherRouter.put(
+  "/profile",
+  authMiddleware,
+  single("profileImage"),
+  updateTeacherProfile,
+);
+teacherRouter.post("/change-password", authMiddleware, changeTeacherPassword);
+teacherRouter.delete("/delete", authMiddleware, deleteTeacher);
+
+// ==================== ADMIN ROUTES ====================
+teacherRouter.post(
+  "/register",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  createTeacher,
+);
+teacherRouter.delete(
+  "/hard-delete/:teacherId",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  hardDeleteTeacher,
+);
+teacherRouter.post(
+  "/reset-password/:teacherId",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  resetTeacherPassword,
+);
+teacherRouter.patch(
+  "/status/:teacherId",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  updateTeacherStatus,
+);
+
+// ==================== GET ROUTES (Admin only) ====================
+teacherRouter.get(
+  "/all",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  getAllTeachers,
+);
+teacherRouter.get(
+  "/:id",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  getTeacherById,
+);
+
+export default teacherRouter;
