@@ -10,6 +10,7 @@ import classRouter from "./src/routes/classesRoutes.service.js";
 import attendanceRouter from "./src/routes/attendanceRoutes.service.js";
 import subjectRouter from "./src/routes/subjectRoutes.service.js";
 
+
 const app = express();
 const port = 3030;
 

@@ -54,46 +54,27 @@ export const createClass = async (req, res) => {
 // ==================== GET ALL CLASSES WITH SECTIONS ====================
 export const getAllClassesWithSections = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const offset = parseInt(req.query.offset) || 0;
 
-    let query = db.select().from(classes);
-    query = query.limit(limit).offset(offset);
-
-    const allClasses = await query;
-
-    const classesWithSections = await Promise.all(
-      allClasses.map(async (cls) => {
-        const classSections = await db
-          .select()
-          .from(sections)
-          .where(eq(sections.class_id, cls.id));
-
-        return {
-          ...cls,
-          sections: classSections,
-          totalSections: classSections.length,
-        };
-      }),
-    );
+    const allClasses = await db.query.classes.findMany({
+      with: {
+        sections: true,
+      },
+    });
 
     return successResponse(
       res,
-      {
-        classes: classesWithSections,
-        pagination: {
-          limit,
-          offset,
-          total: allClasses.length,
-          hasMore: allClasses.length === limit,
-        },
-      },
-      "Classes fetched successfully",
+       allClasses
+      ,"Classes fetched successfully",
       200,
     );
   } catch (error) {
     console.error("Get all classes error:", error);
-    return errorResponse(res, error.message || "Failed to get classes", 500);
+
+    return errorResponse(
+      res,
+      error.message || "Failed to get classes",
+      500,
+    );
   }
 };
 
@@ -101,7 +82,8 @@ export const getAllClassesWithSections = async (req, res) => {
 export const getClassById = async (req, res) => {
   try {
     const { id } = req.params;
-
+    console.log("dfsjdhf",id);
+  
     if (!id) {
       return errorResponse(res, "Class ID is required", 400);
     }
@@ -116,21 +98,10 @@ export const getClassById = async (req, res) => {
       return errorResponse(res, "Class not found", 404);
     }
 
-    const classSections = await db
-      .select()
-      .from(sections)
-      .where(eq(sections.class_id, cls.id));
-
-    const classWithSections = {
-      ...cls,
-      sections: classSections,
-      totalSections: classSections.length,
-    };
-
     return successResponse(
       res,
-      classWithSections,
-      "Class fetched successfully",
+      cls
+     , "Class fetched successfully",
       200,
     );
   } catch (error) {
@@ -206,7 +177,8 @@ export const updateClass = async (req, res) => {
 export const deleteClass = async (req, res) => {
   try {
     const { id } = req.params;
-
+    console.log(id);
+    
     if (!id) {
       return errorResponse(res, "Class ID is required", 400);
     }
@@ -220,11 +192,14 @@ export const deleteClass = async (req, res) => {
     if (!existingClass) {
       return errorResponse(res, "Class not found", 404);
     }
-
+   
+    await db.delete(sections)
+    .where(eq(sections.classId , id))
     const classSections = await db
       .select()
       .from(sections)
-      .where(eq(sections.class_id, id));
+      .where(eq(sections.classId, id));
+      
 
     if (classSections.length > 0) {
       return errorResponse(
@@ -233,10 +208,11 @@ export const deleteClass = async (req, res) => {
         400,
       );
     }
+     
 
-    await db.delete(classes).where(eq(classes.id, id));
+    const deleteclass = await db.delete(classes).where(eq(classes.id, id));
 
-    return successResponse(res, null, "Class deleted successfully", 200);
+    return successResponse(res,"Class deleted successfully", 200);
   } catch (error) {
     console.error("Delete class error:", error);
     return errorResponse(res, error.message || "Failed to delete class", 500);
@@ -273,3 +249,4 @@ export const getAllClasses = async (req, res) => {
     return errorResponse(res, error.message || "Failed to get classes", 500);
   }
 };
+

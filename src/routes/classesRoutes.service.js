@@ -46,6 +46,7 @@ classRouter.get(
   getClassById,
 );
 
+
 // Admin only routes
 classRouter.post(
   "/",

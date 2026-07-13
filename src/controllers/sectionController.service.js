@@ -1,9 +1,10 @@
 // src/controllers/sectionController.js
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/db.js";
 import { sections, classes } from "../db/schema/users.js";
 import { successResponse, errorResponse } from "../lib/response.js";
+import { log } from "console";
 
 // ==================== CREATE SECTION ====================
 export const createSection = async (req, res) => {
@@ -33,21 +34,25 @@ export const createSection = async (req, res) => {
 
     // Check if section already exists in this class
     const existingSection = await db
-      .select()
-      .from(sections)
-      .where(eq(sections.class_id, classId))
-      .where(eq(sections.name, name))
-      .limit(1);
-
+    .select()
+    .from(sections)
+    .where(
+      and(
+      eq(sections.classId, classId),
+      eq(sections.name, name)
+    ))
+    .limit(1);
+    
     if (existingSection.length > 0) {
-      return errorResponse(
-        res,
-        "Section with this name already exists in this class",
-        409,
-      );
-    }
-
-    const sectionId = uuidv4();
+        return errorResponse(
+            res,
+            "Section with this name already exists in this class",
+            409,
+          );
+        }
+        
+        const sectionId = uuidv4();
+    
 
     await db.insert(sections).values({
       id: sectionId,
@@ -85,6 +90,8 @@ export const getAllSections = async (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
     const offset = parseInt(req.query.offset) || 0;
     const classId = req.query.classId || null;
+    console.log(classId);
+    
 
     let query = db.select().from(sections);
 

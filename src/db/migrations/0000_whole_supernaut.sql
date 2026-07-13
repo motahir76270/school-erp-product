@@ -80,11 +80,7 @@ CREATE TABLE `class_subjects` (
 CREATE TABLE `classes` (
 	`id` varchar(36) NOT NULL,
 	`name` varchar(50) NOT NULL,
-	`numeric_value` int NOT NULL,
-	`class_teacher_id` varchar(36),
-	`status` varchar(20) DEFAULT 'active',
-	`created_at` timestamp DEFAULT (now()),
-	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	`user_id` varchar(36) NOT NULL,
 	CONSTRAINT `classes_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
@@ -301,22 +297,27 @@ CREATE TABLE `notifications` (
 	CONSTRAINT `notifications_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `parents` (
+CREATE TABLE `payment_gateway` (
 	`id` varchar(36) NOT NULL,
-	`student_id` varchar(36) NOT NULL,
-	`father_name` varchar(100),
-	`father_occupation` varchar(100),
-	`father_phone` varchar(20),
-	`mother_name` varchar(100),
-	`mother_occupation` varchar(100),
-	`mother_phone` varchar(20),
-	`guardian_name` varchar(100),
-	`guardian_relation` varchar(50),
-	`guardian_phone` varchar(20),
-	`address` text,
+	`user_id` varchar(36) NOT NULL,
+	`key` varchar(36) NOT NULL,
+	`secret_key` varchar(36) NOT NULL,
+	`name` varchar(36) NOT NULL,
+	`callback_url` varchar(120),
 	`created_at` timestamp DEFAULT (now()),
 	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `parents_id` PRIMARY KEY(`id`)
+	CONSTRAINT `payment_gateway_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `permission` (
+	`id` varchar(36) NOT NULL,
+	`teacher_id` varchar(36) NOT NULL,
+	`attendance` boolean DEFAULT false,
+	`classes` boolean DEFAULT false,
+	`exam` boolean DEFAULT false,
+	`created_at` timestamp DEFAULT (now()),
+	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `permission_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
 CREATE TABLE `results` (
@@ -340,11 +341,8 @@ CREATE TABLE `sections` (
 	`id` varchar(36) NOT NULL,
 	`name` varchar(20) NOT NULL,
 	`class_id` varchar(36) NOT NULL,
-	`teacher_id` varchar(36),
+	`user_id` varchar(36),
 	`capacity` int DEFAULT 30,
-	`status` varchar(20) DEFAULT 'active',
-	`created_at` timestamp DEFAULT (now()),
-	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `sections_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
@@ -380,24 +378,30 @@ CREATE TABLE `student_fees` (
 CREATE TABLE `students` (
 	`id` varchar(36) NOT NULL,
 	`user_id` varchar(36) NOT NULL,
+	`username` varchar(10),
+	`email` varchar(255) NOT NULL,
+	`name` varchar(10),
+	`password` varchar(255) DEFAULT '123456',
+	`role` varchar(20) DEFAULT 'student',
 	`roll_number` varchar(20) NOT NULL,
 	`admission_number` varchar(20),
 	`class_id` varchar(36) NOT NULL,
 	`section_id` varchar(36),
 	`date_of_birth` date,
 	`gender` varchar(10),
+	`profile_image` varchar(500),
 	`blood_group` varchar(5),
 	`religion` varchar(50),
 	`caste` varchar(50),
 	`nationality` varchar(50),
 	`aadhar_number` varchar(20),
 	`admission_date` date NOT NULL,
-	`qr_code` text,
+	`qrCode` varchar(500),
 	`status` varchar(20) DEFAULT 'active',
 	`created_at` timestamp DEFAULT (now()),
 	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `students_id` PRIMARY KEY(`id`),
-	CONSTRAINT `students_user_id_unique` UNIQUE(`user_id`),
+	CONSTRAINT `students_email_unique` UNIQUE(`email`),
 	CONSTRAINT `students_admission_number_unique` UNIQUE(`admission_number`)
 );
 --> statement-breakpoint
@@ -450,18 +454,24 @@ CREATE TABLE `teacher_salaries` (
 CREATE TABLE `teachers` (
 	`id` varchar(36) NOT NULL,
 	`user_id` varchar(36) NOT NULL,
+	`username` varchar(10),
+	`email` varchar(255) NOT NULL,
+	`name` varchar(10),
+	`role` varchar(20) DEFAULT 'teacher',
+	`password` varchar(255) DEFAULT '123456',
+	`profile_image` varchar(500),
 	`employee_id` varchar(20) NOT NULL,
 	`qualification` varchar(100),
 	`experience` int,
 	`specialization` varchar(100),
 	`joining_date` date NOT NULL,
 	`salary` decimal(12,2),
-	`qr_code` text,
-	`status` varchar(20) DEFAULT 'active',
+	`qrCode` varchar(500),
+	`is_active` boolean DEFAULT true,
 	`created_at` timestamp DEFAULT (now()),
 	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `teachers_id` PRIMARY KEY(`id`),
-	CONSTRAINT `teachers_user_id_unique` UNIQUE(`user_id`),
+	CONSTRAINT `teachers_email_unique` UNIQUE(`email`),
 	CONSTRAINT `teachers_employee_id_unique` UNIQUE(`employee_id`)
 );
 --> statement-breakpoint

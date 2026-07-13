@@ -89,7 +89,7 @@ export const classes = mysqlTable("classes", {
 export const sections = mysqlTable("sections", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: varchar("name", { length: 20 }).notNull(),
-  classId: varchar("class_id", { length: 36 }).notNull(),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id).notNull(),
   userId: varchar("user_id", { length: 36 }),
   capacity: int("capacity").default(30),
 });

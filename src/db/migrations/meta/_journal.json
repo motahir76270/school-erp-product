@@ -5,92 +5,15 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1783766481824,
-      "tag": "0000_fluffy_silver_surfer",
+      "when": 1783920482124,
+      "tag": "0000_whole_supernaut",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "5",
-      "when": 1783770846642,
-      "tag": "0001_mighty_omega_red",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1783773152667,
-      "tag": "0002_breezy_ink",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1783827280790,
-      "tag": "0003_steady_mister_sinister",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1783829776592,
-      "tag": "0004_productive_texas_twister",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1783839579190,
-      "tag": "0005_absurd_unicorn",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1783839965807,
-      "tag": "0006_wakeful_nightshade",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1783842897414,
-      "tag": "0007_dizzy_penance",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1783844451362,
-      "tag": "0008_cooing_ben_grimm",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "5",
-      "when": 1783844519540,
-      "tag": "0009_small_the_hand",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "5",
-      "when": 1783844625290,
-      "tag": "0010_jazzy_piledriver",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "5",
-      "when": 1783845509796,
-      "tag": "0011_amazing_yellowjacket",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "5",
-      "when": 1783866445612,
-      "tag": "0012_majestic_jack_power",
+      "when": 1783935926858,
+      "tag": "0001_concerned_gauntlet",
       "breakpoints": true
     }
   ]

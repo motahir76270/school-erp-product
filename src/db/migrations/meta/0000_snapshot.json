@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "8b71daa6-b3fb-4994-bcc2-da4b1269e84f",
+  "id": "31713e46-5621-488b-961b-df2f3209c0a6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "assignments": {
@@ -521,44 +521,12 @@
           "notNull": true,
           "autoincrement": false
         },
-        "numeric_value": {
-          "name": "numeric_value",
-          "type": "int",
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar(36)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "class_teacher_id": {
-          "name": "class_teacher_id",
-          "type": "varchar(36)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "'active'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "(now())"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
         }
       },
       "indexes": {},
@@ -1959,8 +1927,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "parents": {
-      "name": "parents",
+    "payment_gateway": {
+      "name": "payment_gateway",
       "columns": {
         "id": {
           "name": "id",
@@ -1969,79 +1937,37 @@
           "notNull": true,
           "autoincrement": false
         },
-        "student_id": {
-          "name": "student_id",
+        "user_id": {
+          "name": "user_id",
           "type": "varchar(36)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "father_name": {
-          "name": "father_name",
-          "type": "varchar(100)",
+        "key": {
+          "name": "key",
+          "type": "varchar(36)",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
-        "father_occupation": {
-          "name": "father_occupation",
-          "type": "varchar(100)",
+        "secret_key": {
+          "name": "secret_key",
+          "type": "varchar(36)",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
-        "father_phone": {
-          "name": "father_phone",
-          "type": "varchar(20)",
+        "name": {
+          "name": "name",
+          "type": "varchar(36)",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
-        "mother_name": {
-          "name": "mother_name",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "mother_occupation": {
-          "name": "mother_occupation",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "mother_phone": {
-          "name": "mother_phone",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "guardian_name": {
-          "name": "guardian_name",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "guardian_relation": {
-          "name": "guardian_relation",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "guardian_phone": {
-          "name": "guardian_phone",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "address": {
-          "name": "address",
-          "type": "text",
+        "callback_url": {
+          "name": "callback_url",
+          "type": "varchar(120)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2067,8 +1993,80 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "parents_id": {
-          "name": "parents_id",
+        "payment_gateway_id": {
+          "name": "payment_gateway_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "permission": {
+      "name": "permission",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teacher_id": {
+          "name": "teacher_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attendance": {
+          "name": "attendance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": false
+        },
+        "classes": {
+          "name": "classes",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": false
+        },
+        "exam": {
+          "name": "exam",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "permission_id": {
+          "name": "permission_id",
           "columns": [
             "id"
           ]
@@ -2211,8 +2209,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "teacher_id": {
-          "name": "teacher_id",
+        "user_id": {
+          "name": "user_id",
           "type": "varchar(36)",
           "primaryKey": false,
           "notNull": false,
@@ -2225,31 +2223,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": 30
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "'active'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "(now())"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
         }
       },
       "indexes": {},
@@ -2474,6 +2447,43 @@
           "notNull": true,
           "autoincrement": false
         },
+        "username": {
+          "name": "username",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "password": {
+          "name": "password",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'123456'"
+        },
+        "role": {
+          "name": "role",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'student'"
+        },
         "roll_number": {
           "name": "roll_number",
           "type": "varchar(20)",
@@ -2512,6 +2522,13 @@
         "gender": {
           "name": "gender",
           "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "profile_image": {
+          "name": "profile_image",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2558,9 +2575,9 @@
           "notNull": true,
           "autoincrement": false
         },
-        "qr_code": {
-          "name": "qr_code",
-          "type": "text",
+        "qrCode": {
+          "name": "qrCode",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2602,10 +2619,10 @@
         }
       },
       "uniqueConstraints": {
-        "students_user_id_unique": {
-          "name": "students_user_id_unique",
+        "students_email_unique": {
+          "name": "students_email_unique",
           "columns": [
-            "user_id"
+            "email"
           ]
         },
         "students_admission_number_unique": {
@@ -2935,6 +2952,50 @@
           "notNull": true,
           "autoincrement": false
         },
+        "username": {
+          "name": "username",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'teacher'"
+        },
+        "password": {
+          "name": "password",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'123456'"
+        },
+        "profile_image": {
+          "name": "profile_image",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "employee_id": {
           "name": "employee_id",
           "type": "varchar(20)",
@@ -2977,20 +3038,20 @@
           "notNull": false,
           "autoincrement": false
         },
-        "qr_code": {
-          "name": "qr_code",
-          "type": "text",
+        "qrCode": {
+          "name": "qrCode",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
-          "default": "'active'"
+          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -3021,10 +3082,10 @@
         }
       },
       "uniqueConstraints": {
-        "teachers_user_id_unique": {
-          "name": "teachers_user_id_unique",
+        "teachers_email_unique": {
+          "name": "teachers_email_unique",
           "columns": [
-            "user_id"
+            "email"
           ]
         },
         "teachers_employee_id_unique": {

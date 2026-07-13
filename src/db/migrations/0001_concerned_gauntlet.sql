@@ -1,0 +1,1 @@
+ALTER TABLE `sections` ADD CONSTRAINT `sections_class_id_classes_id_fk` FOREIGN KEY (`class_id`) REFERENCES `classes`(`id`) ON DELETE no action ON UPDATE no action;
