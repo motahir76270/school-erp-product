@@ -1,33 +1,62 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+// store/slices/teacherSlice.ts
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = '/api/teachers';
+const API_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/teachers`;
 
-interface Teacher {
-  id: number;
-  userId: number;
+// Types
+export interface Teacher {
+  id: string;
+  userId: string | null;
+  username: string;
+  email: string;
+  password: string;
+  role: 'teacher';
+  name: string;
+  phone: string | null;
+  address: string | null;
+  profileImage: string | null;
   employeeId: string;
-  qualification?: string;
-  experience?: number;
-  specialization?: string;
-  salary?: string;
+  qualification: string | null;
+  experience: string | null;
+  specialization: string | null;
   joiningDate: string;
-  qrCode?: string;
+  salary: string | null;
+  qrCode: string | null;
   isActive: boolean;
-  user?: {
-    id: number;
-    email: string;
-    firstName: string;
-    lastName: string;
-    phone?: string;
-    profileImage?: string;
-  };
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string | null;
 }
 
-interface TeacherState {
+export interface CreateTeacherData {
+  email: string;
+  password?: string;
+  name: string;
+  username?: string;
+  employeeId: string;
+  qualification?: string;
+  experience?: string;
+  specialization?: string;
+  joiningDate: string;
+  salary?: string;
+}
+
+export interface UpdateTeacherData {
+  name?: string;
+  username?: string;
+  profileImage?: string;
+  qualification?: string;
+  experience?: string;
+  specialization?: string;
+  salary?: string;
+  isActive?: boolean;
+}
+
+export interface TeacherState {
   teachers: Teacher[];
   currentTeacher: Teacher | null;
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
   pagination: {
     page: number;
@@ -35,12 +64,15 @@ interface TeacherState {
     total: number;
     totalPages: number;
   };
+  qrGenerating: boolean;
+  qrError: string | null;
 }
 
+// Initial State
 const initialState: TeacherState = {
   teachers: [],
   currentTeacher: null,
-  isLoading: false,
+  loading: false,
   error: null,
   pagination: {
     page: 1,
@@ -48,131 +80,257 @@ const initialState: TeacherState = {
     total: 0,
     totalPages: 0,
   },
+  qrGenerating: false,
+  qrError: null,
 };
 
-export const fetchTeachers = createAsyncThunk(
-  'teacher/fetchTeachers',
-  async (params: { page?: number; limit?: number; search?: string } = {}, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: params.page || 1, limit: params.limit || 10, ...params },
-      });
-      return response.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch teachers');
-    }
-  }
-);
-
-export const createTeacher = createAsyncThunk(
-  'teacher/createTeacher',
-  async (teacherData: Partial<Teacher>, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(API_URL, teacherData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to create teacher');
-    }
-  }
-);
-
-export const updateTeacher = createAsyncThunk(
-  'teacher/updateTeacher',
-  async ({ id, data }: { id: number; data: Partial<Teacher> }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.put(`${API_URL}/${id}`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to update teacher');
-    }
-  }
-);
-
-export const deleteTeacher = createAsyncThunk(
-  'teacher/deleteTeacher',
-  async (id: number, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      await axios.delete(`${API_URL}/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return id;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to delete teacher');
-    }
-  }
-);
-
-export const generateTeacherQR = createAsyncThunk(
-  'teacher/generateQR',
-  async (id: number, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/${id}/qr`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to generate QR code');
-    }
-  }
-);
-
+// ==================== Slice ====================
 const teacherSlice = createSlice({
   name: 'teacher',
   initialState,
   reducers: {
+    setTeachers: (state, action: PayloadAction<Teacher[]>) => {
+      state.teachers = action.payload;
+    },
+    setCurrentTeacher: (state, action: PayloadAction<Teacher | null>) => {
+      state.currentTeacher = action.payload;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+    },
+    setPagination: (state, action: PayloadAction<{ page: number; limit: number; total: number; totalPages: number }>) => {
+      state.pagination = action.payload;
+    },
+    setQRGenerating: (state, action: PayloadAction<boolean>) => {
+      state.qrGenerating = action.payload;
+    },
+    setQRError: (state, action: PayloadAction<string | null>) => {
+      state.qrError = action.payload;
+    },
+    clearTeachers: (state) => {
+      state.teachers = [];
+    },
+    clearCurrentTeacher: (state) => {
+      state.currentTeacher = null;
+    },
     clearError: (state) => {
       state.error = null;
+      state.qrError = null;
     },
-  },
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchTeachers.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(fetchTeachers.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.teachers = action.payload.data;
-        state.pagination = action.payload.pagination;
-      })
-      .addCase(fetchTeachers.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      .addCase(createTeacher.fulfilled, (state, action) => {
-        state.teachers.unshift(action.payload);
-      })
-      .addCase(updateTeacher.fulfilled, (state, action) => {
-        const index = state.teachers.findIndex((t) => t.id === action.payload.id);
-        if (index !== -1) {
-          state.teachers[index] = action.payload;
-        }
-      })
-      .addCase(deleteTeacher.fulfilled, (state, action) => {
-        state.teachers = state.teachers.filter((t) => t.id !== action.payload);
-      })
-      .addCase(generateTeacherQR.fulfilled, (state, action) => {
-        if (state.currentTeacher && state.currentTeacher.id === action.payload.id) {
-          state.currentTeacher.qrCode = action.payload.qrCode;
-        }
-      });
+    addTeacher: (state, action: PayloadAction<Teacher>) => {
+      state.teachers.unshift(action.payload);
+    },
+    updateTeacherInList: (state, action: PayloadAction<Teacher>) => {
+      const index = state.teachers.findIndex((t) => t.id === action.payload.id);
+      if (index !== -1) {
+        state.teachers[index] = action.payload;
+      }
+    },
+    removeTeacherFromList: (state, action: PayloadAction<string>) => {
+      state.teachers = state.teachers.filter((t) => t.id !== action.payload);
+    },
   },
 });
 
-export const { clearError } = teacherSlice.actions;
+// ==================== Actions ====================
+export const {
+  setTeachers,
+  setCurrentTeacher,
+  setLoading,
+  setError,
+  setPagination,
+  setQRGenerating,
+  setQRError,
+  clearTeachers,
+  clearCurrentTeacher,
+  clearError,
+  addTeacher,
+  updateTeacherInList,
+  removeTeacherFromList,
+} = teacherSlice.actions;
+
+// ==================== API Calls ====================
+
+// Get All Teachers
+export const getAllTeachersApiCall = async (
+  token: string,
+  page: number = 1,
+  search: string = "",
+  status?: string
+) => {
+  const { data } = await axios.get(`${API_URL}/all`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    params: {
+      page,
+      search,
+      status,
+    },
+  });
+
+  return data;
+};
+
+// Get Teacher by ID
+export const getTeacherByIdApiCall = async (token: string, teacherId: string) => {
+  const { data } = await axios.get(`${API_URL}/${teacherId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Create Teacher
+export const createTeacherApiCall = async (token: string, teacherData: FormData) => {
+  const { data } = await axios.post(`${API_URL}/register`, teacherData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data;
+};
+
+// Update Teacher (Admin)
+export const updateTeacherApiCall = async (token: string, teacherId: string, teacherData: FormData) => {
+  const { data } = await axios.put(`${API_URL}/${teacherId}`, teacherData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data;
+};
+
+// Update Teacher Profile (Self)
+export const updateTeacherProfileApiCall = async (token: string, teacherData: FormData) => {
+  const { data } = await axios.put(`${API_URL}/profile`, teacherData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data;
+};
+
+// Delete Teacher (Soft Delete - Self)
+export const deleteTeacherApiCall = async (token: string) => {
+  const { data } = await axios.delete(`${API_URL}/delete`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Hard Delete Teacher (Admin)
+export const hardDeleteTeacherApiCall = async (token: string, teacherId: string) => {
+  const { data } = await axios.delete(`${API_URL}/hard-delete/${teacherId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Update Teacher Status
+export const updateTeacherStatusApiCall = async (
+  token: string,
+  teacherId: string,
+  status: 'active' | 'inactive' | 'suspended'
+) => {
+  const { data } = await axios.patch(
+    `${API_URL}/status/${teacherId}`,
+    { status },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data;
+};
+
+// Reset Teacher Password (Admin)
+export const resetTeacherPasswordApiCall = async (
+  token: string,
+  teacherId: string,
+  newPassword?: string
+) => {
+  const { data } = await axios.post(
+    `${API_URL}/reset-password/${teacherId}`,
+    { newPassword },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data;
+};
+
+// Change Teacher Password (Self)
+export const changeTeacherPasswordApiCall = async (
+  token: string,
+  currentPassword: string,
+  newPassword: string
+) => {
+  const { data } = await axios.post(
+    `${API_URL}/change-password`,
+    { currentPassword, newPassword },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data;
+};
+
+// Get Teacher Profile (Self)
+export const getTeacherProfileApiCall = async (token: string) => {
+  const { data } = await axios.get(`${API_URL}/profile`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Get Teacher QR Code
+export const getTeacherQRCodeApiCall = async (token: string) => {
+  const { data } = await axios.get(`${API_URL}/qr-code`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Regenerate Teacher QR Code
+export const regenerateTeacherQRCodeApiCall = async (token: string) => {
+  const { data } = await axios.post(
+    `${API_URL}/qr-code/regenerate`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data;
+};
+
+// Teacher Login
+export const teacherLoginApiCall = async (email: string, password: string) => {
+  const { data } = await axios.post(`${API_URL}/login`, { email, password });
+  return data;
+};
+
+// ==================== Export ====================
 export default teacherSlice.reducer;

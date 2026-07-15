@@ -35,6 +35,7 @@ interface SidebarProps {
 const menuItems = {
   super_admin: [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard/admin' },
+    { icon: Users, label: 'Users', href: '/dashboard/admin/users' },
     { icon: Users, label: 'Students', href: '/dashboard/admin/students' },
     { icon: GraduationCap, label: 'Teachers', href: '/dashboard/admin/teachers' },
     { icon: BookOpen, label: 'Classes', href: '/dashboard/admin/classes' },
@@ -93,7 +94,7 @@ export function Sidebar({ role }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user } = useAppSelector((state:any) => state.auth);
 
   const items = menuItems[role] || [];
 

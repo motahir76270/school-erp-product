@@ -43,19 +43,16 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      const result = await registerApiCall(dispatch, data);
+      const result = await registerApiCall(data);
       
       if (result?.success === true) {
-        const role = result?.data?.role;
-        const dashboardRoutes: Record<string, string> = {
-          super_admin: '/dashboard/admin',
-          admin: '/dashboard/admin',
-          teacher: '/dashboard/teacher',
-          student: '/dashboard/student',
-        };
-        router.push(dashboardRoutes[role] || '/dashboard/student');
+        toast.success(result?.message || 'Registration successful');
+        router.push('/login');
+      } else {
+        toast.error(result?.message || 'Registration failed');
       }
-    } catch (error) {
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'An unexpected error occurred');
       console.error('Registration error:', error);
     }
   };
@@ -121,7 +118,7 @@ export default function RegisterPage() {
               <Label htmlFor="role">Role <span className="text-destructive">*</span></Label>
               <Select 
                 value={watch('role')} 
-                onValueChange={(value) => setValue('role', value as 'student' | 'teacher' | 'admin' | 'super_admin')}
+                onValueChange={(value:any) => setValue('role', value as 'student' | 'teacher' | 'admin' | 'super_admin')}
               >
                 <SelectTrigger className={errors.role ? 'border-destructive' : ''}>
                   <SelectValue placeholder="Select role" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -10,18 +10,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loginSchema, LoginFormData } from '@/validations/auth';
-import { login } from '@/src/hooks/apiCall/auth';
+import { loginApiCall } from '@/store/slices/authSlice';
 import { toast } from 'react-toastify';
-import { setUser } from '@/src/store/slices/authSlice';
-import { log } from 'node:console';
+import { setAuthenticated, setToken, setUser } from '@/store/slices/authSlice';
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { loading } = useAppSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
 
   const { register: formRegister, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -33,31 +33,73 @@ export default function LoginPage() {
 
   const onSubmit = async (datas: LoginFormData) => {
     setIsLoading(true);
+    
     try {
-      const data:any = await login(datas);
-      console.log(data);
+      const data = await loginApiCall(datas);
       
       if (data?.success === true) {
-      const token = localStorage.setItem('accessToken', data?.data?.token);
-        toast.success(data?.data?.message);
-        const role = data?.data?.user.role;
+        // Store token and user in localStorage
+        localStorage.setItem('accessToken', data?.data?.token);
+        localStorage.setItem('user', JSON.stringify(data?.data?.user));
+        
+        // Update Redux state
+        dispatch(setUser(data?.data?.user));
+        dispatch(setToken(data?.data?.token));
+        dispatch(setAuthenticated(true));
+        
+        toast.success(data?.message || 'Login successful');
+        
+        const role = data?.data?.user?.role;
         const dashboardRoutes: Record<string, string> = {
           super_admin: '/dashboard/admin',
           admin: '/dashboard/admin',
           teacher: '/dashboard/teacher',
           student: '/dashboard/student',
         };
-       return router.push(dashboardRoutes[role] || '/dashboard/student');
-      }else{
-        toast.error(data?.data?.message);
+        
+        router.push(dashboardRoutes[role] || '/dashboard/student');
+      } else {
+        toast.error(data?.message || 'Login failed');
       }
-    } catch (error) {
-      toast.error('An unexpected error occurred');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'An unexpected error occurred');
       console.error('Login error:', error);
     } finally {
       setIsLoading(false);
-    } 
+    }
   };
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    const userStr = localStorage.getItem('user');
+
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const role = user?.role;
+        
+        // Update Redux state
+        dispatch(setToken(token));
+        dispatch(setUser(user));
+        dispatch(setAuthenticated(true));
+        
+        const dashboardRoutes: Record<string, string> = {
+          super_admin: '/dashboard/admin',
+          admin: '/dashboard/admin',
+          teacher: '/dashboard/teacher',
+          student: '/dashboard/student',
+        };
+        
+        router.push(dashboardRoutes[role] || '/dashboard/student');
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        // Clear invalid data
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+      }
+    }
+  }, [dispatch, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
@@ -111,8 +153,8 @@ export default function LoginPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+            <Button type="submit" className="w-full" disabled={isLoading || loading}>
+              {isLoading || loading ? 'Signing in...' : 'Sign In'}
             </Button>
             <p className="text-sm text-muted-foreground text-center">
               Don&apos;t have an account?{' '}

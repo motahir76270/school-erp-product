@@ -27,14 +27,12 @@ export default function DashboardLayout({
   useEffect(() => {
     const checkAuth = async () => {
       setIsLoading(true);
-      
       try {
         const token = localStorage.getItem('accessToken');
         
         if (token) {
           // If token exists, try to get user
           const response:any = await getCurrentUser(token);
-          
           if (response.success === true) {
             dispatch(setUser(response.data));
             setIsAuthenticated(true);

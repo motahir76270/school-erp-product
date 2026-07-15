@@ -14,6 +14,7 @@ import {
 // Users Table
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),
   role: varchar("role", { length: 20 }).notNull(), // super_admin, admin, teacher, student

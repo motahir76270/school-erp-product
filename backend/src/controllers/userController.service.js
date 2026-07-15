@@ -110,6 +110,9 @@ export const userCreate = async (req, res) => {
   try {
     const { email, password, firstName, lastName, role, phone, address } =
       req.body;
+      let profileImage = req.file;
+       const img = profileImage.path.replace(/\\/g, "/")
+
 
     // Validate input
     if (!email || !password || !firstName || !lastName || !role) {
@@ -143,15 +146,16 @@ export const userCreate = async (req, res) => {
     }
 
     // Generate UUID
-    const userId = uuidv4();
+    const id = uuidv4();
 
     // Insert user
     await db.insert(users).values({
-      id: userId,
+      id: id,
       email,
       password, // Hash before saving in production
       firstName,
       lastName,
+      profileImage:img || null,
       role,
       phone: phone || null,
       address: address || null,
@@ -203,6 +207,7 @@ export const userUpdate = async (req, res) => {
     }
 
     const { firstName, lastName, phone, address } = req.body || {};
+    const profileImage = req.file;
 
     // Check if user exists
     const [existingUser] = await db
@@ -222,6 +227,11 @@ export const userUpdate = async (req, res) => {
     if (lastName !== undefined) updateData.lastName = lastName;
     if (phone !== undefined) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
+
+   if (profileImage) {
+      updateData.profileImage =
+        profileImage.path.replace(/\\/g, "/")
+    }
 
     if (Object.keys(updateData).length === 0) {
       return errorResponse(res, "No data provided for update", 400);
@@ -249,7 +259,6 @@ export const userUpdate = async (req, res) => {
     return errorResponse(res, error.message || "Failed to update user", 500);
   }
 };
-
 
 // ==================== USER RESET PASSWORD ====================
 export const userRestPassword = async (req, res) => {
@@ -653,7 +662,7 @@ export const updateUserProfile = async (req, res) => {
 
     if (profileImage) {
       updateData.profileImage =
-        profileImage.path || profileImage.filename;
+        profileImage.path.replace(/\\/g, "/");
     }
 
 
@@ -732,3 +741,458 @@ export const logoutUser = (req, res) => {
     return errorResponse(res, error.message || "Logout failed", 500);
   }
 }
+
+// ==================== GET All USER  ====================
+export const getAllUsers = async (req, res) => {
+  const id = req.user.id;
+
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  const [existing] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, id));
+
+  if (!existing) {
+    return errorResponse(res, "User not found", 404);
+  }
+
+  const allUsers = await db
+    .select()
+    .from(users)
+    .limit(limit)
+    .offset(offset);
+
+  return successResponse(
+    res,
+    {
+      page,
+      limit,
+      data: allUsers,
+    },
+    200 
+  );
+};
+
+// ==================== Create USER BY SUPER admin ====================
+export const userCreateByadmin = async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, role, phone } = req.body;
+    const profileImage = req.file;
+    const userId = req.user.id;
+
+    // Validate input
+    if (!email || !password || !firstName || !lastName || !role) {
+      return errorResponse(
+        res,
+        "All fields are required: email, password, firstName, lastName, role",
+        400
+      );
+    }
+
+    // Check if email already exists
+    const [existingUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (existingUser) {
+      return errorResponse(res, "User with this email already exists", 409);
+    }
+
+    // Generate UUID
+    const id = uuidv4();
+
+    // Normalize image path
+    const imagePath = profileImage
+      ? profileImage.path.replace(/\\/g, "/")
+      : null;
+
+    // Insert user
+    await db.insert(users).values({
+      id,
+      userId,
+      email,
+      password,
+      firstName,
+      lastName,
+      role,
+      phone: phone || null,
+      address: null,
+      profileImage: imagePath,
+      isActive: true,
+    });
+
+    // Fetch newly created user
+    const [newUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id));
+
+    if (!newUser) {
+      return errorResponse(res, "Failed to retrieve created user", 500);
+    }
+
+
+    return successResponse(
+      res,
+      newUser,
+      "User registered successfully",
+      201
+    );
+  } catch (error) {
+    console.error("Register error:", error);
+    return errorResponse(
+      res,
+      error.message || "Registration failed",
+      500
+    );
+  }
+};
+
+// ==================== GET USER BY ID ====================
+export const getUserById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const requestingUserId = req.user?.id;
+    const requestingUserRole = req.user?.role;
+
+
+    // Check authentication
+    if (!requestingUserId) {
+      return errorResponse(res, "User not authenticated", 401);
+    }
+
+    // Validate user ID
+    if (!userId) {
+      return errorResponse(res, "User ID is required", 400);
+    }
+
+    // Check if user exists
+    const [existingUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, requestingUserId))
+      .limit(1);
+
+    if (!existingUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    // Get target user
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      return errorResponse(res, "Target user not found", 404);
+    }
+
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+        res.cookie("token", token, {
+      httpOnly: true,
+      secure: false, // true in production with HTTPS
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return successResponse(
+      res,
+      {user ,token},
+      "User fetched successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Get user by ID error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to fetch user",
+      500
+    );
+  }
+};
+
+// ==================== UPDATE USER BY ID ====================
+export const updateUserById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Check if target user exists
+    const [targetUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    const { 
+      firstName, 
+      lastName, 
+      email, 
+      phone, 
+      address, 
+      role, 
+      isActive,
+      password 
+    } = req.body || {};
+    const profileImage = req.file;
+
+    const updateData = {};
+
+    if (profileImage) {
+      updateData.profileImage =
+        profileImage.path.replace(/\\/g, "/");
+    }
+
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    
+    // Only super_admin can update role
+    if (role !== undefined) {
+      if (adminRole !== "super_admin") {
+        return errorResponse(res, "Only super_admin can update user roles", 403);
+      }
+      const validRoles = ["super_admin", "admin", "teacher", "student"];
+      if (!validRoles.includes(role)) {
+        return errorResponse(
+          res,
+          "Invalid role. Must be: super_admin, admin, teacher, student",
+          400
+        );
+      }
+      updateData.role = role;
+    }
+
+    // Update password if provided
+    if (password !== undefined) {
+      if (password.length < 6) {
+        return errorResponse(res, "Password must be at least 6 characters", 400);
+      }
+      updateData.password = password;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return errorResponse(res, "No data provided for update", 400);
+    }
+
+    updateData.updatedAt = new Date();
+
+    await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId));
+
+    const [updatedUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const { password: _, resetPasswordToken: __, ...userData } = updatedUser;
+
+    return successResponse(
+      res,
+      userData,
+      "User updated successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Update user by ID error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to update user",
+      500
+    );
+  }
+};
+
+// ==================== UPDATE USER ROLE ====================
+export const updateUserRoleById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const adminId = req.user?.id;
+    const adminRole = req.user?.role;
+    const { role } = req.body || {};
+
+    // Check authentication
+    if (!adminId) {
+      return errorResponse(res, "User not authenticated", 401);
+    }
+
+    // Validate inputs
+    if (!userId) {
+      return errorResponse(res, "User ID is required", 400);
+    }
+
+    if (!role) {
+      return errorResponse(res, "Role is required", 400);
+    }
+
+    // Check if admin exists
+    const [adminUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, adminId))
+      .limit(1);
+
+    if (!adminUser) {
+      return errorResponse(res, "Admin user not found", 404);
+    }
+
+    // Check if target user exists
+    const [targetUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    // Only super_admin can update roles
+    if (adminRole !== "super_admin") {
+      return errorResponse(res, "Unauthorized: Only super_admin can update user roles", 403);
+    }
+
+    // Prevent self-role update
+    if (userId === adminId) {
+      return errorResponse(res, "Cannot update your own role", 403);
+    }
+
+    // Validate role
+    const validRoles = ["super_admin", "admin", "teacher", "student"];
+    if (!validRoles.includes(role)) {
+      return errorResponse(
+        res,
+        "Invalid role. Must be: super_admin, admin, teacher, student",
+        400
+      );
+    }
+
+    // Update role
+    await db
+      .update(users)
+      .set({
+        role,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    const [updatedUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const { password, resetPasswordToken, ...userData } = updatedUser;
+
+    return successResponse(
+      res,
+      userData,
+      "User role updated successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Update user role error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to update user role",
+      500
+    );
+  }
+};
+
+// ==================== DELETE USER ====================
+export const deleteUserById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const adminId = req.user?.id;
+    const adminRole = req.user?.role;
+
+    // Check authentication
+    if (!adminId) {
+      return errorResponse(res, "User not authenticated", 401);
+    }
+
+    // Validate user ID
+    if (!userId) {
+      return errorResponse(res, "User ID is required", 400);
+    }
+
+    // Check if admin exists
+    const [adminUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, adminId))
+      .limit(1);
+
+    if (!adminUser) {
+      return errorResponse(res, "Admin user not found", 404);
+    }
+
+    // Check if target user exists
+    const [targetUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    // Authorization
+    if (adminRole !== "super_admin" && adminRole !== "admin") {
+      return errorResponse(res, "Unauthorized: Only admins can delete users", 403);
+    }
+
+    // Only super_admin can delete super_admin
+    if (targetUser.role === "super_admin" && adminRole !== "super_admin") {
+      return errorResponse(res, "Unauthorized: Only super_admin can delete super_admin users", 403);
+    }
+
+    // Prevent self-deletion
+    if (userId === adminId) {
+      return errorResponse(res, "Cannot delete your own account", 403);
+    }
+
+    // Delete user
+    await db
+      .delete(users)
+      .where(eq(users.id, userId));
+
+    return successResponse(
+      res,
+      null,
+      "User deleted successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Delete user error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to delete user",
+      500
+    );
+  }
+};
+
+
+

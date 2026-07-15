@@ -14,8 +14,7 @@ import {
   hardDeleteTeacher,
   updateTeacherStatus,
   getTeacherQRCode,
-  regenerateTeacherQRCode,
-  scanTeacherQRCode,
+  regenerateTeacherQRCode 
 } from "../controllers/teacherController.service.js";
 import {
   authMiddleware,
@@ -35,12 +34,6 @@ teacherRouter.post(
   "/qr-code/regenerate",
   authMiddleware,
   regenerateTeacherQRCode,
-);
-teacherRouter.get(
-  "/qr-scan/:teacherId",
-  authMiddleware,
-  roleMiddleware(["super_admin", "admin"]),
-  scanTeacherQRCode,
 );
 
 // ==================== PROTECTED TEACHER ROUTES ====================

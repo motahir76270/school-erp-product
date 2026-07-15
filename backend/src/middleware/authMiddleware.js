@@ -6,7 +6,7 @@ export const authMiddleware = (req, res, next) => {
     let token = null;
 
     // Check Authorization header
-    const authHeader = req.headers.authorization || req.cookies("token");
+    const authHeader = req.headers.authorization || req.cookies?.token;
 
     if (authHeader) {
       const parts = authHeader.split(" ");

@@ -1,190 +1,164 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+// store/slices/classSlice.ts
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = '/api/classes';
+const API_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/classes`;
 
-interface Class {
-  id: number;
+// Types
+export interface Class {
+  id: string;
   name: string;
-  numericValue: number;
-  description?: string;
-  classTeacherId?: number;
-  isActive: boolean;
-  sections?: Section[];
-  classTeacher?: { id: number; user: { firstName: string; lastName: string } };
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface Section {
-  id: number;
+export interface Section {
+  id: string;
   name: string;
-  classId: number;
-  capacity: number;
-  currentStrength: number;
-  isActive: boolean;
+  classId: string;
+  capacity?: string | null;
+  currentStrength?: string | null;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface Subject {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-  creditHours: number;
-  isActive: boolean;
-}
-
-interface ClassState {
+export interface ClassState {
   classes: Class[];
   sections: Section[];
-  subjects: Subject[];
-  currentClass: Class | null;
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
 }
 
+// Initial State
 const initialState: ClassState = {
   classes: [],
   sections: [],
-  subjects: [],
-  currentClass: null,
-  isLoading: false,
+  loading: false,
   error: null,
 };
 
-export const fetchClasses = createAsyncThunk(
-  'class/fetchClasses',
-  async (_, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch classes');
-    }
-  }
-);
-
-export const createClass = createAsyncThunk(
-  'class/createClass',
-  async (classData: Partial<Class>, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(API_URL, classData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to create class');
-    }
-  }
-);
-
-export const fetchSections = createAsyncThunk(
-  'class/fetchSections',
-  async (classId: number | undefined, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const url = classId ? `${API_URL}/sections?classId=${classId}` : `${API_URL}/sections`;
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch sections');
-    }
-  }
-);
-
-export const createSection = createAsyncThunk(
-  'class/createSection',
-  async (sectionData: Partial<Section>, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/sections`, sectionData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to create section');
-    }
-  }
-);
-
-export const fetchSubjects = createAsyncThunk(
-  'class/fetchSubjects',
-  async (_, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get('/api/subjects', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch subjects');
-    }
-  }
-);
-
-export const createSubject = createAsyncThunk(
-  'class/createSubject',
-  async (subjectData: Partial<Subject>, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post('/api/subjects', subjectData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to create subject');
-    }
-  }
-);
-
+// ==================== Slice ====================
 const classSlice = createSlice({
   name: 'class',
   initialState,
   reducers: {
+    setClasses: (state, action: PayloadAction<Class[]>) => {
+      state.classes = action.payload;
+    },
+    setSections: (state, action: PayloadAction<Section[]>) => {
+      state.sections = action.payload;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+    },
+    clearClasses: (state) => {
+      state.classes = [];
+    },
+    clearSections: (state) => {
+      state.sections = [];
+    },
     clearError: (state) => {
       state.error = null;
     },
-  },
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchClasses.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(fetchClasses.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.classes = action.payload;
-      })
-      .addCase(fetchClasses.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      .addCase(createClass.fulfilled, (state, action) => {
-        state.classes.push(action.payload);
-      })
-      .addCase(fetchSections.fulfilled, (state, action) => {
-        state.sections = action.payload;
-      })
-      .addCase(createSection.fulfilled, (state, action) => {
-        state.sections.push(action.payload);
-      })
-      .addCase(fetchSubjects.fulfilled, (state, action) => {
-        state.subjects = action.payload;
-      })
-      .addCase(createSubject.fulfilled, (state, action) => {
-        state.subjects.push(action.payload);
-      });
+    addClass: (state, action: PayloadAction<Class>) => {
+      state.classes.unshift(action.payload);
+    },
+    removeClassFromList: (state, action: PayloadAction<string>) => {
+      state.classes = state.classes.filter((c) => c.id !== action.payload);
+    },
+    addSection: (state, action: PayloadAction<Section>) => {
+      state.sections.push(action.payload);
+    },
+    removeSectionFromList: (state, action: PayloadAction<string>) => {
+      state.sections = state.sections.filter((s) => s.id !== action.payload);
+    },
   },
 });
 
-export const { clearError } = classSlice.actions;
+// ==================== Actions ====================
+export const {
+  setClasses,
+  setSections,
+  setLoading,
+  setError,
+  clearClasses,
+  clearSections,
+  clearError,
+  addClass,
+  removeClassFromList,
+  addSection,
+  removeSectionFromList,
+} = classSlice.actions;
+
+// ==================== API Calls ====================
+
+// Get All Classes
+export const getAllClassesApiCall = async (token: string) => {
+  const { data } = await axios.get(`${API_URL}/all`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Get All Sections (with optional classId filter)
+export const getAllSectionsApiCall = async (token: string, classId?: string) => {
+  const { data } = await axios.get(`${API_URL}/sections`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    params: {
+      classId: classId,
+    },
+  });
+  return data;
+};
+
+// Create Class
+export const createClassApiCall = async (token: string, classData: { name: string }) => {
+  const { data } = await axios.post(`${API_URL}/`, classData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Delete Class
+export const deleteClassApiCall = async (token: string, classId: string) => {
+  const { data } = await axios.delete(`${API_URL}/${classId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Create Section
+export const createSectionApiCall = async (token: string, sectionData: { name: string; classId: string; capacity?: string }) => {
+  const { data } = await axios.post(`${API_URL}/sections`, sectionData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// Delete Section
+export const deleteSectionApiCall = async (token: string, sectionId: string) => {
+  const { data } = await axios.delete(`${API_URL}/sections/${sectionId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+};
+
+// ==================== Export ====================
 export default classSlice.reducer;

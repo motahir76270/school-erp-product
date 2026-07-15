@@ -24,7 +24,6 @@ export const createTeacher = async (req, res) => {
       password,
       name,
       username,
-      profileImage,
       employeeId,
       qualification,
       experience,
@@ -35,6 +34,10 @@ export const createTeacher = async (req, res) => {
 
     // Get the admin who is creating this teacher
     const adminId = req.user?.id;
+    const profileImage = req.file;
+     const imagePath = profileImage
+      ? profileImage.path.replace(/\\/g, "/")
+      : null;
 
     if (!adminId) {
       return errorResponse(res, "Unauthorized - Admin ID required", 401);
@@ -142,7 +145,7 @@ export const createTeacher = async (req, res) => {
       name: name,
       username: finalUsername,
       role: "teacher",
-      profileImage: profileImage || null,
+      profileImage: imagePath || null,
       employeeId: employeeId,
       qualification: qualification || null,
       experience: experience || null,
@@ -274,12 +277,14 @@ export const updateTeacher = async (req, res) => {
     const {
       name,
       username,
-      profileImage,
       qualification,
       experience,
       specialization,
       salary,
-    } = req.body;
+    } = req.body; 
+
+    const profileImage = req.file;
+  
 
     // Check if teacher exists
     const [existingTeacher] = await db
@@ -317,6 +322,10 @@ export const updateTeacher = async (req, res) => {
     if (specialization !== undefined)
       teacherUpdateData.specialization = specialization;
     if (salary !== undefined) teacherUpdateData.salary = salary;
+    if (profileImage) {
+      teacherUpdateData.profileImage =
+        profileImage.path.replace(/\\/g, "/");
+    }
     teacherUpdateData.updatedAt = new Date();
 
     // Regenerate QR code if important data changes
@@ -391,7 +400,6 @@ export const getAllTeachers = async (req, res) => {
     const allTeachers = await db
       .select()
       .from(teachers)
-      .where(eq(teachers.userId, id))
       .limit(limit)
       .offset(offset);
 
@@ -409,7 +417,6 @@ export const getAllTeachers = async (req, res) => {
           page,
           limit,
           total,
-          totalPages: Math.ceil(total / limit),
         },
       },
       "Teachers fetched successfully",
@@ -440,7 +447,21 @@ export const getTeacherById = async (req, res) => {
       return errorResponse(res, "Teacher not found", 404);
     }
 
-    return successResponse(res, teacher, "Teacher fetched successfully", 200);
+        const token = generateToken({
+          id: teacher.id,
+          email: teacher.email,
+          role: teacher.role,
+        });
+    
+            res.cookie("token", token, {
+          httpOnly: true,
+          secure: false, // true in production with HTTPS
+          sameSite: "strict",
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+
+
+    return successResponse(res, {teacher,token}, "Teacher fetched successfully", 200);
   } catch (error) {
     console.error("Get teacher error:", error);
     return errorResponse(res, error.message || "Failed to get teacher", 500);
@@ -494,7 +515,7 @@ export const updateTeacherProfile = async (req, res) => {
     const { name, username, qualification, experience, specialization } =
       req.body;
 
-    const profileImage = req.file;
+    const profileImage = req.file;   
 
     const [existingTeacher] = await db
       .select()
@@ -525,12 +546,13 @@ export const updateTeacherProfile = async (req, res) => {
     if (qualification !== undefined)
       teacherUpdateData.qualification = qualification;
     if (experience !== undefined) teacherUpdateData.experience = experience;
-    if (specialization !== undefined)
-      teacherUpdateData.specialization = specialization;
+    if (specialization !== undefined) teacherUpdateData.specialization = specialization;
+
     if (profileImage) {
       teacherUpdateData.profileImage =
-        profileImage.path || profileImage.filename;
+        profileImage.path.replace(/\\/g, "/");
     }
+
     teacherUpdateData.updatedAt = new Date();
 
     // Regenerate QR code if name or qualification changes
@@ -966,44 +988,3 @@ export const regenerateTeacherQRCode = async (req, res) => {
   }
 };
 
-// ==================== SCAN TEACHER QR CODE ====================
-export const scanTeacherQRCode = async (req, res) => {
-  try {
-    const { teacherId } = req.params;
-
-    if (!teacherId) {
-      return errorResponse(res, "Teacher ID is required", 400);
-    }
-
-    const [teacher] = await db
-      .select()
-      .from(teachers)
-      .where(eq(teachers.id, teacherId))
-      .limit(1);
-
-    if (!teacher) {
-      return errorResponse(res, "Teacher not found", 404);
-    }
-
-    const teacherData = {
-      id: teacher.id,
-      userId: teacher.userId,
-      name: teacher.name,
-      email: teacher.email,
-      employeeId: teacher.employeeId,
-      qualification: teacher.qualification,
-      specialization: teacher.specialization,
-      status: teacher.isActive ? "active" : "inactive",
-    };
-
-    return successResponse(
-      res,
-      teacherData,
-      "Teacher data fetched for QR scan",
-      200,
-    );
-  } catch (error) {
-    console.error("Scan QR code error:", error);
-    return errorResponse(res, error.message || "Failed to scan QR code", 500);
-  }
-};

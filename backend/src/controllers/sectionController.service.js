@@ -29,7 +29,7 @@ export const createSection = async (req, res) => {
       .limit(1);
 
     if (!existingClass) {
-      return errorResponse(res, "Class not found", 404);
+      return errorResponse(res, "Class not ", 404);
     }
 
     // Check if section already exists in this class
@@ -87,33 +87,20 @@ export const createSection = async (req, res) => {
 // ==================== GET ALL SECTIONS ====================
 export const getAllSections = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const offset = parseInt(req.query.offset) || 0;
-    const classId = req.query.classId || null;
-    console.log(classId);
-    
+    const classId = req.params.classId || req.query.classId;
+   
 
-    let query = db.select().from(sections);
+    const [sectionsData] = await db.select()
+    .from(sections)
+    .where(eq(sections.classId, classId));
 
-    if (classId) {
-      query = query.where(eq(sections.class_id, classId));
+    if(!sections){
+
     }
-
-    query = query.limit(limit).offset(offset);
-
-    const allSections = await query;
 
     return successResponse(
       res,
-      {
-        sections: allSections,
-        pagination: {
-          limit,
-          offset,
-          total: allSections.length,
-          hasMore: allSections.length === limit,
-        },
-      },
+     sectionsData,
       "Sections fetched successfully",
       200,
     );
@@ -167,21 +154,21 @@ export const getSectionById = async (req, res) => {
 // ==================== GET SECTIONS BY CLASS ID ====================
 export const getSectionsByClass = async (req, res) => {
   try {
-    const { classId } = req.params;
-
+    const  classId  = req.params.classId || req.query.classId;
+    console.log(classId);
+    
     if (!classId) {
       return errorResponse(res, "Class ID is required", 400);
     }
 
-    const [existingClass] = await db
-      .select()
-      .from(classes)
-      .where(eq(classes.id, classId))
-      .limit(1);
+    // const [existingClass] = await db
+    //   .select()
+    //   .from(classes)
+    //   .where(eq(classes.id, classId))
 
-    if (!existingClass) {
-      return errorResponse(res, "Class not found", 404);
-    }
+    // if (!existingClass) {
+    //   return errorResponse(res, "class not found", 404);
+    // }
 
     const sectionsData = await db
       .select()
@@ -232,7 +219,7 @@ export const updateSection = async (req, res) => {
         .limit(1);
 
       if (!newClass) {
-        return errorResponse(res, "Class not found", 404);
+        return errorResponse(res, "Class  found", 404);
       }
 
       // Check if section name already exists in the new class

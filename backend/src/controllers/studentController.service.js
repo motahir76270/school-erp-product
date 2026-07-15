@@ -2,7 +2,7 @@
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/db.js";
-import { students } from "../db/schema/users.js";
+import { students, users } from "../db/schema/users.js";
 import { generateToken } from "../config/auth.js";
 import { successResponse, errorResponse } from "../lib/response.js";
 import { generateQRCode, deleteQRCodeFile } from "../config/qrCode.js";
@@ -30,7 +30,6 @@ export const createStudent = async (req, res) => {
       sectionId,
       dateOfBirth,
       gender,
-      profileImage,
       bloodGroup,
       religion,
       caste,
@@ -38,6 +37,12 @@ export const createStudent = async (req, res) => {
       aadharNumber,
       admissionDate,
     } = req.body;
+
+    const profileImage = req.file;
+
+       const imagePath = profileImage
+      ? profileImage.path.replace(/\\/g, "/")
+      : null;
 
     // Validate required fields
     if (!email || !name || !rollNumber || !classId || !admissionDate) {
@@ -150,7 +155,7 @@ export const createStudent = async (req, res) => {
       sectionId: sectionId || null,
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
-      profileImage: profileImage || null,
+      profileImage: imagePath || null,
       bloodGroup: bloodGroup || null,
       religion: religion || null,
       caste: caste || null,
@@ -259,6 +264,8 @@ export const updateStudent = async (req, res) => {
       status,
     } = req.body;
 
+    const profileImage = req.file;
+
     const [existingStudent] = await db
       .select()
       .from(students)
@@ -314,6 +321,10 @@ export const updateStudent = async (req, res) => {
     if (nationality !== undefined) updateData.nationality = nationality;
     if (aadharNumber !== undefined) updateData.aadharNumber = aadharNumber;
     if (status !== undefined) updateData.status = status;
+    if (profileImage) {
+      updateData.profileImage =
+        profileImage.path.replace(/\\/g, "/");
+    }
     updateData.updatedAt = new Date();
 
     // Regenerate QR code if important data changes
@@ -374,8 +385,11 @@ export const updateStudent = async (req, res) => {
 // ==================== GET ALL STUDENTS ====================
 export const getAllStudents = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const offset = parseInt(req.query.offset) || 0;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+
+    const offset = (page - 1) * limit;
+
     const status = req.query.status || null;
     const classId = req.query.classId || null;
     const sectionId = req.query.sectionId || null;
@@ -394,29 +408,49 @@ export const getAllStudents = async (req, res) => {
       query = query.where(eq(students.sectionId, sectionId));
     }
 
-    query = query.limit(limit).offset(offset);
+    const allStudents = await query
+      .limit(limit)
+      .offset(offset);
 
-    const allStudents = await query;
-    const total = allStudents.length;
+    // Get total count without pagination
+    let countQuery = db.select().from(students);
 
+    if (status) {
+      countQuery = countQuery.where(eq(students.status, status));
+    }
+
+    if (classId) {
+      countQuery = countQuery.where(eq(students.classId, classId));
+    }
+
+    if (sectionId) {
+      countQuery = countQuery.where(eq(students.sectionId, sectionId));
+    }
+
+    const totalStudents = await countQuery;
+    const total = totalStudents.length;
 
     return successResponse(
       res,
       {
         students: allStudents,
         pagination: {
+          page,
           limit,
-          offset,
-          total,
-          hasMore: total === limit,
+          total
         },
       },
       "Students fetched successfully",
-      200,
+      200
     );
+
   } catch (error) {
     console.error("Get all students error:", error);
-    return errorResponse(res, error.message || "Failed to get students", 500);
+    return errorResponse(
+      res,
+      error.message || "Failed to get students",
+      500
+    );
   }
 };
 
@@ -439,11 +473,33 @@ export const getStudentById = async (req, res) => {
       return errorResponse(res, "Student not found", 404);
     }
 
+    const token = generateToken({
+      id: student.id,
+      email: student.email,
+      role: "student",
+    });
 
-    return successResponse(res, student, "Student fetched successfully", 200);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false, // true in production with HTTPS
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return successResponse(
+      res,
+      { student, token },
+      "Student fetched successfully",
+      200
+    );
+
   } catch (error) {
     console.error("Get student error:", error);
-    return errorResponse(res, error.message || "Failed to get student", 500);
+    return errorResponse(
+      res,
+      error.message || "Failed to get student",
+      500
+    );
   }
 };
 

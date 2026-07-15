@@ -1,462 +1,644 @@
+// app/dashboard/classes/page.tsx
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/layout/page-header';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, Trash2, RefreshCw, Plus, BookOpen, Layers, Users } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchStudents } from '@/store/slices/studentSlice';
-import { fetchTeachers } from '@/store/slices/teacherSlice';
-import { fetchClasses, fetchSections, fetchSubjects } from '@/store/slices/classSlice';
-import { fetchAttendanceStats } from '@/store/slices/attendanceSlice';
-import { fetchFees, fetchFeeStats, fetchPayments } from '@/store/slices/feeSlice';
-import { fetchExams } from '@/store/slices/examSlice';
-import { fetchMcqTests } from '@/store/slices/mcqSlice';
-import { fetchBooks, fetchIssues } from '@/store/slices/librarySlice';
-import { fetchNotices, fetchHolidays } from '@/store/slices/noticeSlice';
-import { ArrowRight, Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, DollarSign, FileText, GraduationCap, Library, Settings, Users, Bell, Clock3 } from 'lucide-react';
+import {
+  getAllClassesApiCall,
+  getAllSectionsApiCall,
+  createClassApiCall,
+  createSectionApiCall,
+  deleteClassApiCall,
+  deleteSectionApiCall,
+  setClasses,
+  setSections,
+  setLoading,
+  addClass,
+  addSection,
+  removeClassFromList,
+  removeSectionFromList,
+} from '@/store/slices/classSlice';
+import { toast } from 'react-toastify';
 
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  description: string;
-  icon: React.ElementType;
+interface Class {
+  id: string;
+  name: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-function MetricCard({ title, value, description, icon: Icon }: MetricCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
+interface Section {
+  id: string;
+  name: string;
+  classId: string;
+  capacity?: string | null;
+  currentStrength?: string | null;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-function getModuleKind(pathname: string) {
-  const route = pathname.toLowerCase();
-  if (route.includes('/students')) return 'students';
-  if (route.includes('/teachers')) return 'teachers';
-  if (route.includes('/classes')) return 'classes';
-  if (route.includes('/attendance')) return 'attendance';
-  if (route.includes('/fees')) return 'fees';
-  if (route.includes('/exams')) return 'exams';
-  if (route.includes('/assignments')) return 'assignments';
-  if (route.includes('/mcq')) return 'mcq';
-  if (route.includes('/library')) return 'library';
-  if (route.includes('/notices')) return 'notices';
-  if (route.includes('/holidays')) return 'holidays';
-  if (route.includes('/events')) return 'events';
-  if (route.includes('/results')) return 'results';
-  if (route.includes('/profile')) return 'profile';
-  if (route.includes('/settings')) return 'settings';
-  if (route.includes('/timetable')) return 'timetable';
-  return 'general';
-}
+export default function ClassesPage() {
+  const dispatch = useAppDispatch();
+  const { classes, sections, loading } = useAppSelector((state) => state.class);
+  
+  // Search and filter states
+  const [search, setSearch] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>('classes');
 
-function getTitle(moduleKind: string, pathname: string) {
-  const slug = pathname.split('/').filter(Boolean).pop() || 'dashboard';
-  const titleMap: Record<string, string> = {
-    students: 'Students',
-    teachers: 'Teachers',
-    classes: 'Classes',
-    attendance: 'Attendance',
-    fees: 'Fees',
-    exams: 'Exams',
-    assignments: 'Assignments',
-    mcq: 'MCQ',
-    library: 'Library',
-    notices: 'Notices',
-    holidays: 'Holidays',
-    events: 'Events',
-    results: 'Results',
-    profile: 'Profile',
-    settings: 'Settings',
-    timetable: 'Timetable',
-    general: slug.replace(/-/g, ' ').replace(/\w/g, (letter) => letter.toUpperCase()),
+  // Create class states
+  const [isCreateClassModalOpen, setIsCreateClassModalOpen] = useState(false);
+  const [classForm, setClassForm] = useState({ name: '' });
+  const [isSubmittingClass, setIsSubmittingClass] = useState(false);
+
+  // Create section states
+  const [isCreateSectionModalOpen, setIsCreateSectionModalOpen] = useState(false);
+  const [sectionForm, setSectionForm] = useState({ name: '', capacity: '', classId: '' });
+  const [isSubmittingSection, setIsSubmittingSection] = useState(false);
+
+  const fetchClasses = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+    
+    dispatch(setLoading(true));
+    try {
+      const data = await getAllClassesApiCall(token);
+      console.log('Classes API Response:', data);
+      
+      if (data?.success === true) {
+        const classesData = data.data?.classes || data.data || [];
+        dispatch(setClasses(classesData));
+      } else {
+        toast.error(data?.message || 'Failed to fetch classes');
+        dispatch(setClasses([]));
+      }
+    } catch (error: any) {
+      console.error('Fetch classes error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to fetch classes');
+      dispatch(setClasses([]));
+    } finally {
+      dispatch(setLoading(false));
+    }
   };
 
-  return titleMap[moduleKind] || titleMap.general;
-}
-
-export default function Page() {
-  const pathname = usePathname() || '';
-  const dispatch = useAppDispatch();
-  const studentState = useAppSelector((state) => state.student);
-  const teacherState = useAppSelector((state) => state.teacher);
-  const classState = useAppSelector((state) => state.class);
-  const attendanceState = useAppSelector((state) => state.attendance);
-  const feeState = useAppSelector((state) => state.fee);
-  const examState = useAppSelector((state) => state.exam);
-  const mcqState = useAppSelector((state) => state.mcq);
-  const libraryState = useAppSelector((state) => state.library);
-  const noticeState = useAppSelector((state) => state.notice);
-  const moduleKind = getModuleKind(pathname);
-  const title = getTitle(moduleKind, pathname);
-  const description = `Manage ${title.toLowerCase()} for this dashboard section.`;
-
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-
-    switch (moduleKind) {
-      case 'students':
-        dispatch(fetchStudents({ limit: 5 }));
-        break;
-      case 'teachers':
-        dispatch(fetchTeachers({ limit: 5 }));
-        break;
-      case 'classes':
-        dispatch(fetchClasses());
-        dispatch(fetchSections(undefined));
-        dispatch(fetchSubjects());
-        break;
-      case 'attendance':
-        dispatch(fetchAttendanceStats({ date: today }));
-        break;
-      case 'fees':
-        dispatch(fetchFees());
-        dispatch(fetchFeeStats());
-        dispatch(fetchPayments({ status: 'pending' }));
-        break;
-      case 'exams':
-      case 'results':
-        dispatch(fetchExams());
-        break;
-      case 'mcq':
-        dispatch(fetchMcqTests({ status: 'published' }));
-        break;
-      case 'library':
-        dispatch(fetchBooks({}));
-        dispatch(fetchIssues({ status: 'issued' }));
-        break;
-      case 'notices':
-      case 'holidays':
-      case 'events':
-        dispatch(fetchNotices());
-        dispatch(fetchHolidays());
-        break;
-      default:
-        break;
+  const fetchSections = async (classId?: string) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
     }
-  }, [dispatch, moduleKind]);
+    
+    dispatch(setLoading(true));
+    try {
+      // Only send classId if it exists
+      const data = await getAllSectionsApiCall(token, classId);
+      console.log('Sections API Response:', data);
+      if (data?.success === true) {
+        const sectionsData = data.data || [];
+        dispatch(setSections(sectionsData));
+      } else {
+        toast.error(data?.message || 'Failed to fetch sections');
+        dispatch(setSections([]));
+      }
+    } catch (error: any) {
+      console.error('Fetch sections error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to fetch sections');
+      dispatch(setSections([]));
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
 
-  const renderModuleContent = () => {
-    switch (moduleKind) {
-      case 'students': {
-        const activeStudents = studentState.students.filter((student) => student.isActive).length;
-        const recentStudents = studentState.students.slice(0, 4);
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total students" value={studentState.students.length} description="Students currently in the store" icon={Users} />
-              <MetricCard title="Active" value={activeStudents} description="Accounts marked active" icon={CheckCircle2} />
-              <MetricCard title="Classes" value={new Set(studentState.students.map((student) => student.classId)).size} description="Distinct class groups" icon={GraduationCap} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent student records</CardTitle>
-                <CardDescription>Live data from the students API slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentStudents.length > 0 ? recentStudents.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{student.user?.firstName} {student.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">Roll {student.rollNumber}</p>
-                    </div>
-                    <Badge variant={student.isActive ? 'success' : 'secondary'}>{student.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </div>
-                )) : <p className="text-sm text-muted-foreground">No students loaded yet.</p>}
-              </CardContent>
-            </Card>
-          </div>
-        );
+  // Initial load
+  useEffect(() => {
+    fetchClasses();
+  }, []);
+
+  // Fetch sections when class filter changes in sections tab
+  useEffect(() => {
+    if (activeTab === 'sections') {
+      fetchSections(selectedClassId);
+    }
+  }, [selectedClassId, activeTab]);
+
+  // Filter classes by search
+  const filteredClasses = classes.filter((cls: Class) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return true;
+    return cls.name.toLowerCase().includes(query);
+  });
+
+  // Filter sections by search
+  const filteredSections = sections.filter((section: Section) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return true;
+    return section.name.toLowerCase().includes(query);
+  });
+
+  // Get class name by ID
+  const getClassName = (classId: string) => {
+    const cls = classes.find((c: Class) => c.id === classId);
+    return cls?.name || 'Unknown Class';
+  };
+
+  // ==================== Class CRUD ====================
+
+  const handleCreateClass = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSubmittingClass(true);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        setIsSubmittingClass(false);
+        return;
       }
-      case 'teachers': {
-        const activeTeachers = teacherState.teachers.filter((teacher) => teacher.isActive).length;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total teachers" value={teacherState.teachers.length} description="Teachers fetched from the API" icon={GraduationCap} />
-              <MetricCard title="Active" value={activeTeachers} description="Currently active teachers" icon={CheckCircle2} />
-              <MetricCard title="Employees" value={teacherState.teachers.length} description="Ready for roster and profile review" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Teaching staff</CardTitle>
-                <CardDescription>Latest teacher records from the Redux teacher slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {teacherState.teachers.slice(0, 4).map((teacher) => (
-                  <div key={teacher.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{teacher.user?.firstName} {teacher.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{teacher.specialization || 'Teaching staff'}</p>
-                    </div>
-                    <Badge variant="outline">{teacher.employeeId}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
+
+      const data = await createClassApiCall(token, { name: classForm.name });
+
+      if (data?.success === true) {
+        toast.success(data?.message || 'Class created successfully');
+        dispatch(addClass(data.data));
+        setClassForm({ name: '' });
+        setIsCreateClassModalOpen(false);
+        await fetchClasses();
+      } else {
+        toast.error(data?.message || 'Failed to create class');
       }
-      case 'classes': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Classes" value={classState.classes.length} description="Class groups available" icon={BookOpen} />
-              <MetricCard title="Sections" value={classState.sections.length} description="Sections fetched from the API" icon={Users} />
-              <MetricCard title="Subjects" value={classState.subjects.length} description="Subjects in the curriculum" icon={ClipboardList} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Class overview</CardTitle>
-                <CardDescription>Most recent school classes and sections.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {classState.classes.slice(0, 4).map((classItem) => (
-                  <div key={classItem.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{classItem.name}</p>
-                      <p className="text-sm text-muted-foreground">{classItem.description || 'Academic class'}</p>
-                    </div>
-                    <Badge variant="secondary">{classItem.sections?.length || 0} sections</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to create class');
+    } finally {
+      setIsSubmittingClass(false);
+    }
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this class?')) {
+      return;
+    }
+
+    try {
+      const data = await deleteClassApiCall(token, classId);
+      if (data?.success === true) {
+        toast.success(data?.message || 'Class deleted successfully');
+        dispatch(removeClassFromList(classId));
+        await fetchClasses();
+        // Refresh sections if they were filtered by this class
+        if (selectedClassId === classId) {
+          setSelectedClassId('');
+          await fetchSections();
+        }
+      } else {
+        toast.error(data?.message || 'Failed to delete class');
       }
-      case 'attendance': {
-        const stats = attendanceState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <MetricCard title="Present" value={stats.present} description="Present today" icon={CheckCircle2} />
-              <MetricCard title="Absent" value={stats.absent} description="Absentees" icon={Clock3} />
-              <MetricCard title="Late" value={stats.late} description="Late arrivals" icon={CalendarDays} />
-              <MetricCard title="Total" value={stats.total} description="Tracked students" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance snapshot</CardTitle>
-                <CardDescription>Stats from the attendance slice.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Attendance records are available for the current day and can be expanded with detailed views.</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to delete class');
+    }
+  };
+
+  // ==================== Section CRUD ====================
+
+  const handleCreateSection = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSubmittingSection(true);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        setIsSubmittingSection(false);
+        return;
       }
-      case 'fees': {
-        const stats = feeState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Collected" value={stats.collected} description="Amount collected" icon={DollarSign} />
-              <MetricCard title="Pending" value={stats.pending} description="Pending payments" icon={Clock3} />
-              <MetricCard title="Fees" value={feeState.fees.length} description="Fee structures configured" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Fee overview</CardTitle>
-                <CardDescription>Recent fee and payment records.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {feeState.fees.slice(0, 4).map((fee) => (
-                  <div key={fee.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{fee.name}</p>
-                      <p className="text-sm text-muted-foreground">{fee.feeType}</p>
-                    </div>
-                    <Badge variant="outline">{fee.amount}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
+
+      if (!sectionForm.classId) {
+        toast.error('Please select a class');
+        setIsSubmittingSection(false);
+        return;
       }
-      case 'exams':
-      case 'results': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Exams" value={examState.exams.length} description="Exams in the system" icon={ClipboardList} />
-              <MetricCard title="Results" value={examState.results.length} description="Stored result entries" icon={Award} />
-              <MetricCard title="Marks" value={examState.marks.length} description="Marks records available" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Exam schedule</CardTitle>
-                <CardDescription>Latest exam data returned by the exam slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {examState.exams.slice(0, 4).map((exam) => (
-                  <div key={exam.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{exam.name}</p>
-                      <p className="text-sm text-muted-foreground">{exam.examType}</p>
-                    </div>
-                    <Badge variant="outline">{exam.totalMarks} marks</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
+
+      const data = await createSectionApiCall(token, {
+        name: sectionForm.name,
+        classId: sectionForm.classId,
+        capacity: sectionForm.capacity || undefined,
+      });
+
+      if (data?.success === true) {
+        toast.success(data?.message || 'Section created successfully');
+        dispatch(addSection(data.data));
+        setSectionForm({ name: '', capacity: '', classId: '' });
+        setIsCreateSectionModalOpen(false);
+        await fetchSections(selectedClassId || undefined);
+      } else {
+        toast.error(data?.message || 'Failed to create section');
       }
-      case 'mcq': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Tests" value={mcqState.tests.length} description="MCQ tests published" icon={ClipboardList} />
-              <MetricCard title="Questions" value={mcqState.questions.length} description="Questions loaded" icon={FileText} />
-              <MetricCard title="Leaderboard" value={mcqState.leaderboard.length} description="Leaderboard entries" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>MCQ tests</CardTitle>
-                <CardDescription>Current test set from the MCQ slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {mcqState.tests.slice(0, 4).map((test) => (
-                  <div key={test.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{test.title}</p>
-                      <p className="text-sm text-muted-foreground">{test.totalQuestions} questions • {test.duration} mins</p>
-                    </div>
-                    <Badge variant="secondary">{test.status}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to create section');
+    } finally {
+      setIsSubmittingSection(false);
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this section?')) {
+      return;
+    }
+
+    try {
+      const data = await deleteSectionApiCall(token, sectionId);
+      if (data?.success === true) {
+        toast.success(data?.message || 'Section deleted successfully');
+        dispatch(removeSectionFromList(sectionId));
+        await fetchSections(selectedClassId || undefined);
+      } else {
+        toast.error(data?.message || 'Failed to delete section');
       }
-      case 'library': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Books" value={libraryState.books.length} description="Library books available" icon={Library} />
-              <MetricCard title="Available" value={libraryState.books.filter((book) => book.availableCopies > 0).length} description="Books ready to issue" icon={BookOpen} />
-              <MetricCard title="Issues" value={libraryState.issues.length} description="Active book issues" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Library activity</CardTitle>
-                <CardDescription>Books and borrowed records from the library slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {libraryState.books.slice(0, 4).map((book) => (
-                  <div key={book.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-sm text-muted-foreground">{book.author}</p>
-                    </div>
-                    <Badge variant="outline">{book.availableCopies}/{book.totalCopies}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'notices':
-      case 'holidays':
-      case 'events': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Notices" value={noticeState.notices.length} description="Published notices" icon={Bell} />
-              <MetricCard title="Holidays" value={noticeState.holidays.length} description="Calendar events" icon={CalendarDays} />
-              <MetricCard title="Status" value="Live" description="Data from notices and holidays slices" icon={CheckCircle2} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Communication feed</CardTitle>
-                <CardDescription>Recent notices and special days.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {noticeState.notices.slice(0, 4).map((notice) => (
-                  <div key={notice.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{notice.title}</p>
-                      <p className="text-sm text-muted-foreground">{notice.target}</p>
-                    </div>
-                    <Badge variant="secondary">{notice.priority}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      default:
-        return (
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>Use this section to review the latest module data and actions.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">Live dashboard view</Badge>
-                  <Badge variant="outline">Ready for data</Badge>
-                </div>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {['Track the latest records for this section.', 'Use the dashboard tools to manage daily tasks.', 'Review upcoming actions and keep your workflow current.'].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick actions</CardTitle>
-                <CardDescription>Useful next steps for this module.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Review records and assigned users</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Open recent entries and updates</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Plan upcoming activities and deadlines</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Settings className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Adjust module preferences and visibility</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to delete section');
     }
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader title={title} description={description} />
-      {renderModuleContent()}
+      <PageHeader 
+        title="Classes & Sections" 
+        description="Manage classes and their sections."
+      />
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>All Classes & Sections</CardTitle>
+            <CardDescription>Manage classes and sections in the system</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                if (activeTab === 'classes') {
+                  fetchClasses();
+                } else {
+                  fetchSections(selectedClassId || undefined);
+                }
+              }} 
+              disabled={loading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            {activeTab === 'classes' ? (
+              <Button size="sm" onClick={() => setIsCreateClassModalOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Class
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setIsCreateSectionModalOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Section
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="classes" className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Classes
+                <Badge variant="secondary" className="ml-1">
+                  {classes.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="sections" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Sections
+                <Badge variant="secondary" className="ml-1">
+                  {sections.length}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Classes Tab */}
+            <TabsContent value="classes">
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search classes by name..."
+                  className="pl-9"
+                />
+              </div>
+              
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Class Name</TableHead>
+                      <TableHead>Created At</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                          Loading classes...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredClasses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                          No classes found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredClasses.map((cls: Class) => (
+                        <TableRow key={cls.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <BookOpen className="h-5 w-5 text-muted-foreground" />
+                              <span className="font-medium">{cls.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(cls.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteClass(cls.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+
+            {/* Sections Tab */}
+            <TabsContent value="sections">
+              <div className="flex flex-col md:flex-row gap-4 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search sections by name..."
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  value={selectedClassId}
+                  onValueChange={(value) => setSelectedClassId(value)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Classes</SelectItem>
+                    {classes.map((cls: any) => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Section Name</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Current Strength</TableHead>
+                      <TableHead>Created At</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Loading sections...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredSections.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No sections found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredSections.map((section: Section) => (
+                        <TableRow key={section.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-3">
+                              <Layers className="h-5 w-5 text-muted-foreground" />
+                              {section.name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {getClassName(section.classId)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{section.capacity || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              <Users className="h-3 w-3 mr-1" />
+                              {section.currentStrength || '0'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(section.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteSection(section.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Create Class Modal */}
+      <Dialog open={isCreateClassModalOpen} onOpenChange={setIsCreateClassModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Create New Class</DialogTitle>
+            <DialogDescription>
+              Add a new class to the platform.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateClass} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="className">Class Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="className"
+                value={classForm.name}
+                onChange={(e) => setClassForm({ name: e.target.value })}
+                placeholder="e.g., Class 10, Class 12, Grade 5"
+                required
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsCreateClassModalOpen(false);
+                  setClassForm({ name: '' });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isSubmittingClass}>
+                {isSubmittingClass ? 'Creating...' : 'Create Class'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Section Modal */}
+      <Dialog open={isCreateSectionModalOpen} onOpenChange={setIsCreateSectionModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Create New Section</DialogTitle>
+            <DialogDescription>
+              Add a new section to a class.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSection} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="sectionClass">Class <span className="text-destructive">*</span></Label>
+              <Select
+                value={sectionForm.classId}
+                onValueChange={(value) => setSectionForm({ ...sectionForm, classId: value })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((cls: Class) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sectionName">Section Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="sectionName"
+                value={sectionForm.name}
+                onChange={(e) => setSectionForm({ ...sectionForm, name: e.target.value })}
+                placeholder="e.g., A, B, Science, Arts"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sectionCapacity">Capacity</Label>
+              <Input
+                id="sectionCapacity"
+                type="number"
+                value={sectionForm.capacity}
+                onChange={(e) => setSectionForm({ ...sectionForm, capacity: e.target.value })}
+                placeholder="Max students (optional)"
+                min="1"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsCreateSectionModalOpen(false);
+                  setSectionForm({ name: '', capacity: '', classId: '' });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isSubmittingSection}>
+                {isSubmittingSection ? 'Creating...' : 'Create Section'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
