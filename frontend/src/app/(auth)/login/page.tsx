@@ -15,12 +15,13 @@ import { loginSchema, LoginFormData } from '@/validations/auth';
 import { login } from '@/src/hooks/apiCall/auth';
 import { toast } from 'react-toastify';
 import { setUser } from '@/src/store/slices/authSlice';
+import { log } from 'node:console';
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false)
 
   const { register: formRegister, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -33,11 +34,11 @@ export default function LoginPage() {
   const onSubmit = async (datas: LoginFormData) => {
     setIsLoading(true);
     try {
-      const {data}:any = await login(datas);
+      const data:any = await login(datas);
+      console.log(data);
       
-      if (data.success === true) {
+      if (data?.success === true) {
       const token = localStorage.setItem('accessToken', data?.data?.token);
-        dispatch(setUser(data.data));
         toast.success(data?.data?.message);
         const role = data?.data?.user.role;
         const dashboardRoutes: Record<string, string> = {
@@ -46,8 +47,8 @@ export default function LoginPage() {
           teacher: '/dashboard/teacher',
           student: '/dashboard/student',
         };
-        router.push(dashboardRoutes[role] || '/dashboard/student');
-      } else {
+       return router.push(dashboardRoutes[role] || '/dashboard/student');
+      }else{
         toast.error(data?.data?.message);
       }
     } catch (error) {
@@ -55,7 +56,7 @@ export default function LoginPage() {
       console.error('Login error:', error);
     } finally {
       setIsLoading(false);
-    }
+    } 
   };
 
   return (

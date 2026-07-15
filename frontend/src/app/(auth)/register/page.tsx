@@ -18,14 +18,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { register as registerUser, clearError } from '@/store/slices/authSlice';
+import { registerApiCall } from '@/store/slices/authSlice';
 import { registerSchema, RegisterFormData } from '@/validations/auth';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'react-toastify';
 
 export default function RegisterPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error } = useAppSelector((state) => state.auth);
+  const { loading } = useAppSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
 
   const { register: formRegister, handleSubmit, setValue, watch, formState: { errors } } = useForm<RegisterFormData>({
@@ -42,17 +42,21 @@ export default function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterFormData) => {
-    dispatch(clearError());
-    const result = await dispatch(registerUser(data));
-    if (registerUser.fulfilled.match(result)) {
-      const role = result.payload.user.role;
-      const dashboardRoutes: Record<string, string> = {
-        super_admin: '/dashboard/admin',
-        admin: '/dashboard/admin',
-        teacher: '/dashboard/teacher',
-        student: '/dashboard/student',
-      };
-      router.push(dashboardRoutes[role] || '/dashboard/student');
+    try {
+      const result = await registerApiCall(dispatch, data);
+      
+      if (result?.success === true) {
+        const role = result?.data?.role;
+        const dashboardRoutes: Record<string, string> = {
+          super_admin: '/dashboard/admin',
+          admin: '/dashboard/admin',
+          teacher: '/dashboard/teacher',
+          student: '/dashboard/student',
+        };
+        router.push(dashboardRoutes[role] || '/dashboard/student');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
     }
   };
 
@@ -70,11 +74,6 @@ export default function RegisterPage() {
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name <span className="text-destructive">*</span></Label>
@@ -82,6 +81,7 @@ export default function RegisterPage() {
                   id="firstName"
                   placeholder="John"
                   {...formRegister('firstName')}
+                  className={errors.firstName ? 'border-destructive' : ''}
                 />
                 {errors.firstName && <p className="text-sm text-destructive">{errors.firstName.message}</p>}
               </div>
@@ -91,6 +91,7 @@ export default function RegisterPage() {
                   id="lastName"
                   placeholder="Doe"
                   {...formRegister('lastName')}
+                  className={errors.lastName ? 'border-destructive' : ''}
                 />
                 {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
               </div>
@@ -102,6 +103,7 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="john@example.com"
                 {...formRegister('email')}
+                className={errors.email ? 'border-destructive' : ''}
               />
               {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
@@ -113,11 +115,15 @@ export default function RegisterPage() {
                 placeholder="+1234567890"
                 {...formRegister('phone')}
               />
+              {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role <span className="text-destructive">*</span></Label>
-              <Select value={watch('role')} onValueChange={(value) => setValue('role', value as 'student' | 'teacher')}>
-                <SelectTrigger>
+              <Select 
+                value={watch('role')} 
+                onValueChange={(value) => setValue('role', value as 'student' | 'teacher' | 'admin' | 'super_admin')}
+              >
+                <SelectTrigger className={errors.role ? 'border-destructive' : ''}>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -125,22 +131,26 @@ export default function RegisterPage() {
                   <SelectItem value="teacher">Teacher</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.role && <p className="text-sm text-destructive">{errors.role.message}</p>}
             </div>
-            <div className="space-y-2 relative">
+            <div className="space-y-2">
               <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Min 6 characters"
-                {...formRegister('password')}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-9 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Min 6 characters"
+                  {...formRegister('password')}
+                  className={errors.password ? 'border-destructive' : ''}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
             </div>
             <div className="space-y-2">
@@ -150,13 +160,14 @@ export default function RegisterPage() {
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Confirm your password"
                 {...formRegister('confirmPassword')}
+                className={errors.confirmPassword ? 'border-destructive' : ''}
               />
               {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" loading={isLoading}>
-              Create Account
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
             <p className="text-sm text-muted-foreground text-center">
               Already have an account?{' '}

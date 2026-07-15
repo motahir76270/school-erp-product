@@ -11,7 +11,7 @@ import classRouter from "./src/routes/classesRoutes.service.js";
 import attendanceRouter from "./src/routes/attendanceRoutes.service.js";
 import subjectRouter from "./src/routes/subjectRoutes.service.js";
 
-
+dotenv.config();
 const app = express();
 const port = 3030;
 
@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename);
 // Recreate __filename and __dirname in ES Modules
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   }),
 );
 
