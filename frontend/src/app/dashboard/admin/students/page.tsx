@@ -53,6 +53,7 @@ import {
 } from '@/store/slices/studentSlice';
 import { toast } from 'react-toastify';
 import Image from 'next/image';
+import { getAllClassWithSections } from '@/src/store/slices/classSlice';
 
 interface Student {
   id: string;
@@ -85,6 +86,19 @@ interface Student {
   lastLoginAt: string | null;
 }
 
+interface ClassData {
+  id: string;
+  name: string;
+  userId: string;
+  sections: Array<{
+    id: string;
+    name: string;
+    classId: string;
+    userId: string;
+    capacity: number;
+  }>;
+}
+
 export default function StudentsPage() {
   const baseURl = process.env.NEXT_PUBLIC_BASE_URL_FILE;
   const dispatch = useAppDispatch();
@@ -93,6 +107,11 @@ export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
   
+  // Class and section states
+  const [classes, setClasses] = useState<ClassData[]>([]);
+  const [availableSections, setAvailableSections] = useState<Array<{id: string, name: string}>>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+
   // Create student form states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
@@ -202,8 +221,46 @@ export default function StudentsPage() {
     }
   };
 
+  const fetchClasses = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    setIsLoadingClasses(true);
+    try {
+      const data = await getAllClassWithSections(token);
+      if (data?.success === true && data?.data) {
+        setClasses(data.data);
+      } else {
+        toast.error(data?.message || 'Failed to fetch classes');
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to fetch classes');
+    } finally {
+      setIsLoadingClasses(false);
+    }
+  };
+
+  // Handle class selection for both forms
+  const handleClassChange = (classId: string, formType: 'create' | 'edit') => {
+    const selectedClass = classes.find(c => c.id === classId);
+    const sections = selectedClass?.sections || [];
+    
+    if (formType === 'create') {
+      setForm({ ...form, classId, sectionId: '' });
+      setAvailableSections(sections);
+    } else {
+      setEditForm({ ...editForm, classId, sectionId: '' });
+      setAvailableSections(sections);
+    }
+  };
+
   useEffect(() => {
+    const token = localStorage.getItem('accessToken');
     fetchStudents(currentPage);
+    fetchClasses();
   }, [search, currentPage, statusFilter]);
 
   const filteredStudents = useMemo(() => {
@@ -283,6 +340,7 @@ export default function StudentsPage() {
           admissionDate: '',
         });
         setAvatarFile(null);
+        setAvailableSections([]);
         setIsCreateModalOpen(false);
         await fetchStudents(currentPage);
       } else {
@@ -371,6 +429,11 @@ export default function StudentsPage() {
           aadharNumber: studentData.aadharNumber || '',
           status: studentData.status,
         });
+        
+        // Set available sections based on the student's class
+        const selectedClass = classes.find(c => c.id === studentData.classId);
+        setAvailableSections(selectedClass?.sections || []);
+        
         setCurrentAvatar(studentData.profileImage);
         setEditAvatarFile(null);
         setIsEditModalOpen(true);
@@ -423,6 +486,7 @@ export default function StudentsPage() {
         setEditingStudent(null);
         setEditAvatarFile(null);
         setCurrentAvatar(null);
+        setAvailableSections([]);
         await fetchStudents(currentPage);
       } else {
         toast.error(data?.message || 'Failed to update student');
@@ -579,6 +643,7 @@ export default function StudentsPage() {
       admissionDate: '',
     });
     setAvatarFile(null);
+    setAvailableSections([]);
     setIsCreateModalOpen(false);
   };
 
@@ -692,7 +757,7 @@ export default function StudentsPage() {
                           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted overflow-hidden">
                             {student.profileImage ? (
                               <Image
-                                src={`${baseURl}${student.profileImage}`}
+                                src={`${baseURl}/${student.profileImage}`}
                                 alt={student.name}
                                 width={40}
                                 height={40}
@@ -884,27 +949,53 @@ export default function StudentsPage() {
                 />
               </div>
             </div>
+            
+            {/* Class and Section Dropdowns - Updated */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="classId">Class <span className="text-destructive">*</span></Label>
-                <Input
-                  id="classId"
+                <Select
                   value={form.classId}
-                  onChange={(e) => setForm({ ...form, classId: e.target.value })}
-                  placeholder="Class ID"
+                  onValueChange={(value) => handleClassChange(value, 'create')}
                   required
-                />
+                >
+                  <SelectTrigger disabled={isLoadingClasses}>
+                    <SelectValue placeholder={isLoadingClasses ? "Loading classes..." : "Select class"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sectionId">Section</Label>
-                <Input
-                  id="sectionId"
+                <Select
                   value={form.sectionId}
-                  onChange={(e) => setForm({ ...form, sectionId: e.target.value })}
-                  placeholder="Section ID"
-                />
+                  onValueChange={(value) => setForm({ ...form, sectionId: value })}
+                  disabled={!form.classId || availableSections.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !form.classId ? "Select class first" : 
+                      availableSections.length === 0 ? "No sections available" : 
+                      "Select section"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSections.map((section) => (
+                      <SelectItem key={section.id} value={section.id}>
+                        {section.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="dateOfBirth">Date of Birth</Label>
@@ -1077,25 +1168,53 @@ export default function StudentsPage() {
                 />
               </div>
             </div>
+            
+            {/* Edit Class and Section Dropdowns - Updated */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="edit-classId">Class <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-classId"
+                <Select
                   value={editForm.classId}
-                  onChange={(e) => setEditForm({ ...editForm, classId: e.target.value })}
+                  onValueChange={(value) => handleClassChange(value, 'edit')}
                   required
-                />
+                >
+                  <SelectTrigger disabled={isLoadingClasses}>
+                    <SelectValue placeholder={isLoadingClasses ? "Loading classes..." : "Select class"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-sectionId">Section</Label>
-                <Input
-                  id="edit-sectionId"
+                <Select
                   value={editForm.sectionId}
-                  onChange={(e) => setEditForm({ ...editForm, sectionId: e.target.value })}
-                />
+                  onValueChange={(value) => setEditForm({ ...editForm, sectionId: value })}
+                  disabled={!editForm.classId || availableSections.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !editForm.classId ? "Select class first" : 
+                      availableSections.length === 0 ? "No sections available" : 
+                      "Select section"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSections.map((section) => (
+                      <SelectItem key={section.id} value={section.id}>
+                        {section.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="edit-dateOfBirth">Date of Birth</Label>
@@ -1235,6 +1354,7 @@ export default function StudentsPage() {
                   setEditingStudent(null);
                   setEditAvatarFile(null);
                   setCurrentAvatar(null);
+                  setAvailableSections([]);
                 }}
               >
                 Cancel
@@ -1306,12 +1426,18 @@ export default function StudentsPage() {
                   <p className="font-medium">{viewingStudent.bloodGroup || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Class ID</p>
-                  <p className="font-medium">{viewingStudent.classId}</p>
+                  <p className="text-sm text-muted-foreground">Class</p>
+                  <p className="font-medium">
+                    {classes.find(c => c.id === viewingStudent.classId)?.name || viewingStudent.classId}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Section ID</p>
-                  <p className="font-medium">{viewingStudent.sectionId || 'N/A'}</p>
+                  <p className="text-sm text-muted-foreground">Section</p>
+                  <p className="font-medium">
+                    {viewingStudent.sectionId 
+                      ? classes.find(c => c.id === viewingStudent.classId)?.sections.find(s => s.id === viewingStudent.sectionId)?.name || viewingStudent.sectionId
+                      : 'N/A'}
+                  </p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-sm text-muted-foreground">Address</p>

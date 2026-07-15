@@ -1,33 +1,55 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+// store/slices/attendanceSlice.ts
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = '/api/attendance';
+// ==================== TYPES ====================
+
+interface AttendanceLog {
+  id: string;
+  attendanceId: string;
+  studentId: string;
+  status: 'present' | 'absent' | 'late' | 'leave';
+  remarks?: string;
+  markedAt: string;
+  student?: {
+    id: string;
+    name: string;
+  };
+}
 
 interface AttendanceRecord {
-  id: number;
-  studentId: number;
-  classId: number;
-  sectionId: number;
+  id: string;
   date: string;
-  status: 'present' | 'absent' | 'late' | 'leave';
-  markedByTeacherId: number;
-  markedMethod: 'manual' | 'qr';
-  remarks?: string;
-  checkInTime?: string;
-  checkOutTime?: string;
-  student?: {
-    id: number;
-    rollNumber: string;
-    user: { firstName: string; lastName: string };
+  classId: string;
+  sectionId: string | null;
+  markedBy: string;
+  markingMethod: 'manual' | 'qrcode';
+  createdAt: string;
+  logs: AttendanceLog[];
+  stats: {
+    total: number;
+    present: number;
+    absent: number;
+    late: number;
+    leave: number;
   };
 }
 
 interface AttendanceState {
   records: AttendanceRecord[];
-  teacherAttendance: AttendanceRecord[];
-  todayAttendance: AttendanceRecord[];
+  currentAttendance: AttendanceRecord | null;
+  studentAttendance: AttendanceLog[];
+  attendanceSummary: any[];
+  todayAttendance: AttendanceLog[];
   isLoading: boolean;
+  isSubmitting: boolean;
   error: string | null;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
   stats: {
     present: number;
     absent: number;
@@ -37,152 +59,302 @@ interface AttendanceState {
   };
 }
 
+// ==================== INITIAL STATE ====================
+
 const initialState: AttendanceState = {
   records: [],
-  teacherAttendance: [],
+  currentAttendance: null,
+  studentAttendance: [],
+  attendanceSummary: [],
   todayAttendance: [],
   isLoading: false,
+  isSubmitting: false,
   error: null,
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  },
   stats: { present: 0, absent: 0, late: 0, leave: 0, total: 0 },
 };
 
-export const fetchAttendance = createAsyncThunk(
-  'attendance/fetchAttendance',
-  async (params: { classId: number; sectionId: number; date: string }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-      return response.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch attendance');
-    }
-  }
-);
-
-export const markAttendance = createAsyncThunk(
-  'attendance/markAttendance',
-  async (data: { classId: number; sectionId: number; attendance: { studentId: number; status: string; remarks?: string }[] }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/mark`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to mark attendance');
-    }
-  }
-);
-
-export const markQRAttendance = createAsyncThunk(
-  'attendance/markQRAttendance',
-  async (data: { qrCode: string; teacherId: number }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/qr`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to mark QR attendance');
-    }
-  }
-);
-
-export const fetchTeacherAttendance = createAsyncThunk(
-  'attendance/fetchTeacherAttendance',
-  async (params: { date?: string }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get(`${API_URL}/teachers`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-      return response.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch teacher attendance');
-    }
-  }
-);
-
-export const markTeacherAttendance = createAsyncThunk(
-  'attendance/markTeacherAttendance',
-  async (data: { teacherId: number; status: string; qrCode?: string }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/teachers/mark`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to mark teacher attendance');
-    }
-  }
-);
-
-export const fetchAttendanceStats = createAsyncThunk(
-  'attendance/fetchStats',
-  async (params: { classId?: number; date?: string }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get(`${API_URL}/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-      return response.data.data;
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
-      return rejectWithValue(axiosError.response?.data?.error || 'Failed to fetch attendance stats');
-    }
-  }
-);
+// ==================== SLICE ====================
 
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState,
   reducers: {
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
+    setSubmitting: (state, action: PayloadAction<boolean>) => {
+      state.isSubmitting = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+    },
     clearError: (state) => {
       state.error = null;
     },
-  },
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchAttendance.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(fetchAttendance.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.records = action.payload.data;
-      })
-      .addCase(fetchAttendance.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      .addCase(markAttendance.fulfilled, (state, action) => {
-        state.todayAttendance = action.payload;
-      })
-      .addCase(markQRAttendance.fulfilled, (state, action) => {
-        state.todayAttendance.push(action.payload);
-      })
-      .addCase(fetchTeacherAttendance.fulfilled, (state, action) => {
-        state.teacherAttendance = action.payload.data;
-      })
-      .addCase(markTeacherAttendance.fulfilled, (state, action) => {
-        state.teacherAttendance.push(action.payload);
-      })
-      .addCase(fetchAttendanceStats.fulfilled, (state, action) => {
-        state.stats = action.payload;
-      });
+    setAttendanceRecords: (state, action: PayloadAction<AttendanceRecord[]>) => {
+      state.records = action.payload;
+    },
+    setCurrentAttendance: (state, action: PayloadAction<AttendanceRecord | null>) => {
+      state.currentAttendance = action.payload;
+    },
+    setStudentAttendance: (state, action: PayloadAction<AttendanceLog[]>) => {
+      state.studentAttendance = action.payload;
+    },
+    setAttendanceSummary: (state, action: PayloadAction<any[]>) => {
+      state.attendanceSummary = action.payload;
+    },
+    setTodayAttendance: (state, action: PayloadAction<AttendanceLog[]>) => {
+      state.todayAttendance = action.payload;
+    },
+    setAttendanceStats: (state, action: PayloadAction<{ present: number; absent: number; late: number; leave: number; total: number }>) => {
+      state.stats = action.payload;
+    },
+    setPagination: (state, action: PayloadAction<{ page: number; limit: number; total: number; totalPages: number }>) => {
+      state.pagination = action.payload;
+    },
+    addTodayAttendance: (state, action: PayloadAction<AttendanceLog>) => {
+      state.todayAttendance.push(action.payload);
+    },
+    updateAttendanceLog: (state, action: PayloadAction<AttendanceLog>) => {
+      const index = state.todayAttendance.findIndex(log => log.id === action.payload.id);
+      if (index !== -1) {
+        state.todayAttendance[index] = action.payload;
+      }
+    },
+    resetAttendanceState: () => initialState,
   },
 });
 
-export const { clearError } = attendanceSlice.actions;
+// ==================== ACTIONS ====================
+
+export const {
+  setLoading,
+  setSubmitting,
+  setError,
+  clearError,
+  setAttendanceRecords,
+  setCurrentAttendance,
+  setStudentAttendance,
+  setAttendanceSummary,
+  setTodayAttendance,
+  setAttendanceStats,
+  setPagination,
+  addTodayAttendance,
+  updateAttendanceLog,
+  resetAttendanceState,
+} = attendanceSlice.actions;
+
+// ==================== API CALLS ====================
+
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/attendance` ;
+
+
+// Helper function for headers
+const getHeaders = (token?: string) => ({
+  headers: {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  },
+});
+
+// Helper function to handle errors
+const handleApiError = (error: any): never => {
+  const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
+  throw { success: false, message: errorMessage };
+};
+
+// ==================== ATTENDANCE API CALLS ====================
+
+// Mark Attendance (Manual)
+export const markAttendanceApiCall = async (
+  token: string,
+  payload: {
+    date: string;
+    classId: string;
+    sectionId?: string;
+    markingMethod?: 'manual' | 'qrcode';
+    students: Array<{
+      studentId: string;
+      status: 'present' | 'absent' | 'late' | 'leave';
+      remarks?: string;
+    }>;
+  }
+) => {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE_URL}/mark`,
+      payload,
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Mark Attendance via QR Code
+export const markAttendanceViaQRApiCall = async (
+  token: string,
+  payload: {
+    studentId: string;
+    date: string;
+    classId: string;
+    sectionId?: string;
+  }
+) => {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE_URL}/mark-qr`,
+      payload,
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Get Attendance by Date
+export const getAttendanceByDateApiCall = async (
+  token: string,
+  params: {
+    date: string;
+    classId: string;
+    sectionId?: string;
+  }
+) => {
+  try {
+    const { data } = await axios.get(
+      `${API_BASE_URL}/date`,
+      {
+        ...getHeaders(token),
+        params,
+      }
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Get Student Attendance
+export const getStudentAttendanceApiCall = async (
+  token: string,
+  studentId: string,
+  params?: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    offset?: number;
+  }
+) => {
+  try {
+    const { data } = await axios.get(
+      `${API_BASE_URL}/student/${studentId}`,
+      {
+        ...getHeaders(token),
+        params,
+      }
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Get Attendance Summary
+export const getAttendanceSummaryApiCall = async (
+  token: string,
+  params: {
+    classId: string;
+    sectionId?: string;
+    startDate: string;
+    endDate: string;
+  }
+) => {
+  try {
+    const { data } = await axios.get(
+      `${API_BASE_URL}/summary`,
+      {
+        ...getHeaders(token),
+        params,
+      }
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Update Attendance Status
+export const updateAttendanceStatusApiCall = async (
+  token: string,
+  logId: string,
+  payload: {
+    status: 'present' | 'absent' | 'late' | 'leave';
+    remarks?: string;
+  }
+) => {
+  try {
+    const { data } = await axios.put(
+      `${API_BASE_URL}/log/${logId}`,
+      payload,
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Delete Attendance Record
+export const deleteAttendanceApiCall = async (
+  token: string,
+  attendanceId: string
+) => {
+  try {
+    const { data } = await axios.delete(
+      `${API_BASE_URL}/${attendanceId}`,
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// Get Today's Attendance for a Class
+export const getTodayAttendanceApiCall = async (
+  token: string,
+  params: {
+    classId: string;
+    sectionId?: string;
+  }
+) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await axios.get(
+      `${API_BASE_URL}/date`,
+      {
+        ...getHeaders(token),
+        params: {
+          date: today,
+          ...params,
+        },
+      }
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
+// ==================== EXPORT ====================
+
 export default attendanceSlice.reducer;

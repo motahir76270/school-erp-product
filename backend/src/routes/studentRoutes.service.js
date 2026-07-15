@@ -24,7 +24,7 @@ import {
   authMiddleware,
   roleMiddleware,
 } from "../middleware/authMiddleware.js";
-import { single } from "../config/uploadFile.js";
+import upload, { single } from "../config/uploadFile.js";
 
 const studentRouter = Router();
 
@@ -47,7 +47,7 @@ studentRouter.get(
 
 // ==================== PROTECTED STUDENT ROUTES ====================
 studentRouter.get("/profile", authMiddleware, getStudentProfile);
-studentRouter.put("/update", authMiddleware, updateStudent);
+studentRouter.put("/update", authMiddleware,upload.single(['profileImage']), updateStudent);
 studentRouter.put(
   "/profile",
   authMiddleware,
@@ -62,6 +62,7 @@ studentRouter.post(
   "/register",
   authMiddleware,
   roleMiddleware(["super_admin", "admin"]),
+  upload.single(['profileImage']),
   createStudent,
 );
 studentRouter.delete(
@@ -76,7 +77,7 @@ studentRouter.post(
   roleMiddleware(["super_admin", "admin"]),
   resetStudentPassword,
 );
-studentRouter.patch(
+studentRouter.put(
   "/status/:studentId",
   authMiddleware,
   roleMiddleware(["super_admin", "admin"]),

@@ -79,10 +79,9 @@ export const getAllClassesWithSections = async (req, res) => {
 };
 
 // ==================== GET CLASS BY ID WITH SECTIONS ====================
-export const getClassById = async (req, res) => {
+export const getClassWithSections = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log("dfsjdhf",id);
   
     if (!id) {
       return errorResponse(res, "Class ID is required", 400);

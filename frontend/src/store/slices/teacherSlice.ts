@@ -166,11 +166,13 @@ export const getAllTeachersApiCall = async (
       Authorization: `Bearer ${token}`,
     },
     params: {
-      page,
-      search,
-      status,
+      page
     },
   });
+
+  console.log('====================================');
+  console.log("sakjfdajdfk");
+  console.log('====================================');
 
   return data;
 };

@@ -5,6 +5,7 @@ import {
   teacherLogin,
   updateTeacher,
   getAllTeachers,
+  updateTeacherById,
   getTeacherById,
   getTeacherProfile,
   updateTeacherProfile,
@@ -20,7 +21,7 @@ import {
   authMiddleware,
   roleMiddleware,
 } from "../middleware/authMiddleware.js";
-import { single } from "../config/uploadFile.js";
+import upload, { single } from "../config/uploadFile.js";
 
 
 const teacherRouter = Router();
@@ -38,11 +39,11 @@ teacherRouter.post(
 
 // ==================== PROTECTED TEACHER ROUTES ====================
 teacherRouter.get("/profile", authMiddleware, getTeacherProfile);
-teacherRouter.put("/update", authMiddleware, updateTeacher);
+teacherRouter.put("/update", authMiddleware,upload.single(['profileImage']), updateTeacher);
 teacherRouter.put(
   "/profile",
   authMiddleware,
-  single("profileImage"),
+  upload.single("profileImage"),
   updateTeacherProfile,
 );
 teacherRouter.post("/change-password", authMiddleware, changeTeacherPassword);
@@ -53,8 +54,18 @@ teacherRouter.post(
   "/register",
   authMiddleware,
   roleMiddleware(["super_admin", "admin"]),
+  upload.single(['profileImage']),
   createTeacher,
 );
+
+teacherRouter.put(
+  "/:id",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  upload.single("profileImage"),
+  updateTeacherById,
+);
+
 teacherRouter.delete(
   "/hard-delete/:teacherId",
   authMiddleware,
@@ -81,6 +92,7 @@ teacherRouter.get(
   roleMiddleware(["super_admin", "admin"]),
   getAllTeachers,
 );
+
 teacherRouter.get(
   "/:id",
   authMiddleware,

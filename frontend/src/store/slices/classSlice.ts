@@ -109,7 +109,7 @@ export const getAllClassesApiCall = async (token: string) => {
 
 // Get All Sections (with optional classId filter)
 export const getAllSectionsApiCall = async (token: string, classId?: string) => {
-  const { data } = await axios.get(`${API_URL}/sections`, {
+  const { data } = await axios.get(`${API_URL}/sectionsByClass`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -159,6 +159,17 @@ export const deleteSectionApiCall = async (token: string, sectionId: string) => 
   });
   return data;
 };
+
+export const getAllClassWithSections = async(token:any)=>{
+  // classes-section
+  const { data } = await axios.get(`${API_URL}/classes-section`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data;
+}
+
 
 // ==================== Export ====================
 export default classSlice.reducer;

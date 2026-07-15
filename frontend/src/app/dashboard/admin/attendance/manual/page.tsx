@@ -1,462 +1,524 @@
+// dashboard/admin/attendance/manual/page.tsx
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/layout/page-header';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchStudents } from '@/store/slices/studentSlice';
-import { fetchTeachers } from '@/store/slices/teacherSlice';
-import { fetchClasses, fetchSections, fetchSubjects } from '@/store/slices/classSlice';
-import { fetchAttendanceStats } from '@/store/slices/attendanceSlice';
-import { fetchFees, fetchFeeStats, fetchPayments } from '@/store/slices/feeSlice';
-import { fetchExams } from '@/store/slices/examSlice';
-import { fetchMcqTests } from '@/store/slices/mcqSlice';
-import { fetchBooks, fetchIssues } from '@/store/slices/librarySlice';
-import { fetchNotices, fetchHolidays } from '@/store/slices/noticeSlice';
-import { ArrowRight, Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, DollarSign, FileText, GraduationCap, Library, Settings, Users, Bell, Clock3 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Search, Save, User, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
+import { markAttendanceApiCall, getAttendanceByDateApiCall } from '@/store/slices/attendanceSlice';
+import { getAllClassWithSections } from '@/store/slices/classSlice';
+import { getAllStudentsApiCall } from '@/store/slices/studentSlice';
+import { format } from 'date-fns';
 
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  description: string;
-  icon: React.ElementType;
+interface Student {
+  id: string;
+  name: string;
+  rollNumber: string;
+  email: string;
+  classId: string;
+  sectionId: string | null;
+  status?: 'present' | 'absent' | 'late' | 'leave';
+  remarks?: string;
 }
 
-function MetricCard({ title, value, description, icon: Icon }: MetricCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function getModuleKind(pathname: string) {
-  const route = pathname.toLowerCase();
-  if (route.includes('/students')) return 'students';
-  if (route.includes('/teachers')) return 'teachers';
-  if (route.includes('/classes')) return 'classes';
-  if (route.includes('/attendance')) return 'attendance';
-  if (route.includes('/fees')) return 'fees';
-  if (route.includes('/exams')) return 'exams';
-  if (route.includes('/assignments')) return 'assignments';
-  if (route.includes('/mcq')) return 'mcq';
-  if (route.includes('/library')) return 'library';
-  if (route.includes('/notices')) return 'notices';
-  if (route.includes('/holidays')) return 'holidays';
-  if (route.includes('/events')) return 'events';
-  if (route.includes('/results')) return 'results';
-  if (route.includes('/profile')) return 'profile';
-  if (route.includes('/settings')) return 'settings';
-  if (route.includes('/timetable')) return 'timetable';
-  return 'general';
-}
-
-function getTitle(moduleKind: string, pathname: string) {
-  const slug = pathname.split('/').filter(Boolean).pop() || 'dashboard';
-  const titleMap: Record<string, string> = {
-    students: 'Students',
-    teachers: 'Teachers',
-    classes: 'Classes',
-    attendance: 'Attendance',
-    fees: 'Fees',
-    exams: 'Exams',
-    assignments: 'Assignments',
-    mcq: 'MCQ',
-    library: 'Library',
-    notices: 'Notices',
-    holidays: 'Holidays',
-    events: 'Events',
-    results: 'Results',
-    profile: 'Profile',
-    settings: 'Settings',
-    timetable: 'Timetable',
-    general: slug.replace(/-/g, ' ').replace(/\w/g, (letter) => letter.toUpperCase()),
-  };
-
-  return titleMap[moduleKind] || titleMap.general;
-}
-
-export default function Page() {
-  const pathname = usePathname() || '';
-  const dispatch = useAppDispatch();
-  const studentState = useAppSelector((state) => state.student);
-  const teacherState = useAppSelector((state) => state.teacher);
-  const classState = useAppSelector((state) => state.class);
-  const attendanceState = useAppSelector((state) => state.attendance);
-  const feeState = useAppSelector((state) => state.fee);
-  const examState = useAppSelector((state) => state.exam);
-  const mcqState = useAppSelector((state) => state.mcq);
-  const libraryState = useAppSelector((state) => state.library);
-  const noticeState = useAppSelector((state) => state.notice);
-  const moduleKind = getModuleKind(pathname);
-  const title = getTitle(moduleKind, pathname);
-  const description = `Manage ${title.toLowerCase()} for this dashboard section.`;
+export default function ManualAttendancePage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [saving, setSaving] = useState(false);
+  const [attendanceMarked, setAttendanceMarked] = useState(false);
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    fetchClasses();
+  }, []);
 
-    switch (moduleKind) {
-      case 'students':
-        dispatch(fetchStudents({ limit: 5 }));
-        break;
-      case 'teachers':
-        dispatch(fetchTeachers({ limit: 5 }));
-        break;
-      case 'classes':
-        dispatch(fetchClasses());
-        dispatch(fetchSections(undefined));
-        dispatch(fetchSubjects());
-        break;
-      case 'attendance':
-        dispatch(fetchAttendanceStats({ date: today }));
-        break;
-      case 'fees':
-        dispatch(fetchFees());
-        dispatch(fetchFeeStats());
-        dispatch(fetchPayments({ status: 'pending' }));
-        break;
-      case 'exams':
-      case 'results':
-        dispatch(fetchExams());
-        break;
-      case 'mcq':
-        dispatch(fetchMcqTests({ status: 'published' }));
-        break;
-      case 'library':
-        dispatch(fetchBooks({}));
-        dispatch(fetchIssues({ status: 'issued' }));
-        break;
-      case 'notices':
-      case 'holidays':
-      case 'events':
-        dispatch(fetchNotices());
-        dispatch(fetchHolidays());
-        break;
-      default:
-        break;
+  useEffect(() => {
+    if (selectedClass) {
+      fetchStudents();
     }
-  }, [dispatch, moduleKind]);
+  }, [selectedClass, selectedSection]);
 
-  const renderModuleContent = () => {
-    switch (moduleKind) {
-      case 'students': {
-        const activeStudents = studentState.students.filter((student) => student.isActive).length;
-        const recentStudents = studentState.students.slice(0, 4);
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total students" value={studentState.students.length} description="Students currently in the store" icon={Users} />
-              <MetricCard title="Active" value={activeStudents} description="Accounts marked active" icon={CheckCircle2} />
-              <MetricCard title="Classes" value={new Set(studentState.students.map((student) => student.classId)).size} description="Distinct class groups" icon={GraduationCap} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent student records</CardTitle>
-                <CardDescription>Live data from the students API slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentStudents.length > 0 ? recentStudents.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{student.user?.firstName} {student.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">Roll {student.rollNumber}</p>
-                    </div>
-                    <Badge variant={student.isActive ? 'success' : 'secondary'}>{student.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </div>
-                )) : <p className="text-sm text-muted-foreground">No students loaded yet.</p>}
-              </CardContent>
-            </Card>
-          </div>
-        );
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = students.filter(student =>
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredStudents(filtered);
+    } else {
+      setFilteredStudents(students);
+    }
+  }, [searchTerm, students]);
+
+  const fetchClasses = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
       }
-      case 'teachers': {
-        const activeTeachers = teacherState.teachers.filter((teacher) => teacher.isActive).length;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total teachers" value={teacherState.teachers.length} description="Teachers fetched from the API" icon={GraduationCap} />
-              <MetricCard title="Active" value={activeTeachers} description="Currently active teachers" icon={CheckCircle2} />
-              <MetricCard title="Employees" value={teacherState.teachers.length} description="Ready for roster and profile review" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Teaching staff</CardTitle>
-                <CardDescription>Latest teacher records from the Redux teacher slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {teacherState.teachers.slice(0, 4).map((teacher) => (
-                  <div key={teacher.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{teacher.user?.firstName} {teacher.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{teacher.specialization || 'Teaching staff'}</p>
-                    </div>
-                    <Badge variant="outline">{teacher.employeeId}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
+
+      const data = await getAllClassWithSections(token);
+      if (data?.success) {
+        setClasses(data.data);
       }
-      case 'classes': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Classes" value={classState.classes.length} description="Class groups available" icon={BookOpen} />
-              <MetricCard title="Sections" value={classState.sections.length} description="Sections fetched from the API" icon={Users} />
-              <MetricCard title="Subjects" value={classState.subjects.length} description="Subjects in the curriculum" icon={ClipboardList} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Class overview</CardTitle>
-                <CardDescription>Most recent school classes and sections.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {classState.classes.slice(0, 4).map((classItem) => (
-                  <div key={classItem.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{classItem.name}</p>
-                      <p className="text-sm text-muted-foreground">{classItem.description || 'Academic class'}</p>
-                    </div>
-                    <Badge variant="secondary">{classItem.sections?.length || 0} sections</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'attendance': {
-        const stats = attendanceState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <MetricCard title="Present" value={stats.present} description="Present today" icon={CheckCircle2} />
-              <MetricCard title="Absent" value={stats.absent} description="Absentees" icon={Clock3} />
-              <MetricCard title="Late" value={stats.late} description="Late arrivals" icon={CalendarDays} />
-              <MetricCard title="Total" value={stats.total} description="Tracked students" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance snapshot</CardTitle>
-                <CardDescription>Stats from the attendance slice.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Attendance records are available for the current day and can be expanded with detailed views.</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'fees': {
-        const stats = feeState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Collected" value={stats.collected} description="Amount collected" icon={DollarSign} />
-              <MetricCard title="Pending" value={stats.pending} description="Pending payments" icon={Clock3} />
-              <MetricCard title="Fees" value={feeState.fees.length} description="Fee structures configured" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Fee overview</CardTitle>
-                <CardDescription>Recent fee and payment records.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {feeState.fees.slice(0, 4).map((fee) => (
-                  <div key={fee.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{fee.name}</p>
-                      <p className="text-sm text-muted-foreground">{fee.feeType}</p>
-                    </div>
-                    <Badge variant="outline">{fee.amount}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'exams':
-      case 'results': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Exams" value={examState.exams.length} description="Exams in the system" icon={ClipboardList} />
-              <MetricCard title="Results" value={examState.results.length} description="Stored result entries" icon={Award} />
-              <MetricCard title="Marks" value={examState.marks.length} description="Marks records available" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Exam schedule</CardTitle>
-                <CardDescription>Latest exam data returned by the exam slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {examState.exams.slice(0, 4).map((exam) => (
-                  <div key={exam.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{exam.name}</p>
-                      <p className="text-sm text-muted-foreground">{exam.examType}</p>
-                    </div>
-                    <Badge variant="outline">{exam.totalMarks} marks</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'mcq': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Tests" value={mcqState.tests.length} description="MCQ tests published" icon={ClipboardList} />
-              <MetricCard title="Questions" value={mcqState.questions.length} description="Questions loaded" icon={FileText} />
-              <MetricCard title="Leaderboard" value={mcqState.leaderboard.length} description="Leaderboard entries" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>MCQ tests</CardTitle>
-                <CardDescription>Current test set from the MCQ slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {mcqState.tests.slice(0, 4).map((test) => (
-                  <div key={test.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{test.title}</p>
-                      <p className="text-sm text-muted-foreground">{test.totalQuestions} questions • {test.duration} mins</p>
-                    </div>
-                    <Badge variant="secondary">{test.status}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'library': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Books" value={libraryState.books.length} description="Library books available" icon={Library} />
-              <MetricCard title="Available" value={libraryState.books.filter((book) => book.availableCopies > 0).length} description="Books ready to issue" icon={BookOpen} />
-              <MetricCard title="Issues" value={libraryState.issues.length} description="Active book issues" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Library activity</CardTitle>
-                <CardDescription>Books and borrowed records from the library slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {libraryState.books.slice(0, 4).map((book) => (
-                  <div key={book.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-sm text-muted-foreground">{book.author}</p>
-                    </div>
-                    <Badge variant="outline">{book.availableCopies}/{book.totalCopies}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'notices':
-      case 'holidays':
-      case 'events': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Notices" value={noticeState.notices.length} description="Published notices" icon={Bell} />
-              <MetricCard title="Holidays" value={noticeState.holidays.length} description="Calendar events" icon={CalendarDays} />
-              <MetricCard title="Status" value="Live" description="Data from notices and holidays slices" icon={CheckCircle2} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Communication feed</CardTitle>
-                <CardDescription>Recent notices and special days.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {noticeState.notices.slice(0, 4).map((notice) => (
-                  <div key={notice.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{notice.title}</p>
-                      <p className="text-sm text-muted-foreground">{notice.target}</p>
-                    </div>
-                    <Badge variant="secondary">{notice.priority}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      default:
-        return (
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>Use this section to review the latest module data and actions.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">Live dashboard view</Badge>
-                  <Badge variant="outline">Ready for data</Badge>
-                </div>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {['Track the latest records for this section.', 'Use the dashboard tools to manage daily tasks.', 'Review upcoming actions and keep your workflow current.'].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick actions</CardTitle>
-                <CardDescription>Useful next steps for this module.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Review records and assigned users</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Open recent entries and updates</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Plan upcoming activities and deadlines</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Settings className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Adjust module preferences and visibility</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to fetch classes');
     }
   };
+
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
+
+      // Fetch students for the selected class
+      const data = await getAllStudentsApiCall(token, 1, '', '', selectedClass, selectedSection);
+      
+      if (data?.success) {
+        const studentsData = data.data.students.map((student: any) => ({
+          ...student,
+          status: undefined,
+          remarks: '',
+        }));
+        setStudents(studentsData);
+        setFilteredStudents(studentsData);
+        setAttendanceMarked(false);
+        
+        // Check if attendance already marked for today
+        await checkExistingAttendance(studentsData);
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to fetch students');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkExistingAttendance = async (studentsList: Student[]) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      const data = await getAttendanceByDateApiCall(token, {
+        date,
+        classId: selectedClass,
+        sectionId: selectedSection,
+      });
+
+      if (data?.success && data.data.attendance) {
+        // Mark attendance for students who already have it
+        const updatedStudents = studentsList.map(student => {
+          const existingLog = data.data.logs.find(
+            (log: any) => log.studentId === student.id
+          );
+          if (existingLog) {
+            return {
+              ...student,
+              status: existingLog.status,
+              remarks: existingLog.remarks || '',
+            };
+          }
+          return student;
+        });
+        
+        setStudents(updatedStudents);
+        setFilteredStudents(updatedStudents);
+        setAttendanceMarked(true);
+        toast.info('Attendance already marked for today. You can update it.');
+      }
+    } catch (error) {
+      // Attendance not found, proceed with new marking
+      console.log('No existing attendance found');
+    }
+  };
+
+  const handleStatusChange = (studentId: string, status: 'present' | 'absent' | 'late' | 'leave') => {
+    const updatedStudents = students.map(student => {
+      if (student.id === studentId) {
+        return { ...student, status };
+      }
+      return student;
+    });
+    setStudents(updatedStudents);
+    setFilteredStudents(updatedStudents);
+  };
+
+  const handleRemarksChange = (studentId: string, remarks: string) => {
+    const updatedStudents = students.map(student => {
+      if (student.id === studentId) {
+        return { ...student, remarks };
+      }
+      return student;
+    });
+    setStudents(updatedStudents);
+    setFilteredStudents(updatedStudents);
+  };
+
+  const handleMarkAll = (status: 'present' | 'absent') => {
+    const updatedStudents = students.map(student => ({
+      ...student,
+      status: status,
+    }));
+    setStudents(updatedStudents);
+    setFilteredStudents(updatedStudents);
+  };
+
+  const handleSaveAttendance = async () => {
+    // Validate
+    const unmarked = students.filter(s => !s.status);
+    if (unmarked.length > 0) {
+      toast.error(`Please mark attendance for ${unmarked.length} student(s)`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
+
+      const attendanceData = students.map(student => ({
+        studentId: student.id,
+        status: student.status || 'absent',
+        remarks: student.remarks || '',
+      }));
+
+      const payload = {
+        date,
+        classId: selectedClass,
+        sectionId: selectedSection || undefined,
+        markingMethod: 'manual',
+        students: attendanceData,
+      };
+
+      const data = await markAttendanceApiCall(token, payload);
+      
+      if (data?.success) {
+        toast.success(data?.message || 'Attendance saved successfully');
+        setAttendanceMarked(true);
+        setTimeout(() => {
+          router.push('/dashboard/admin/attendance');
+        }, 1500);
+      } else {
+        toast.error(data?.message || 'Failed to save attendance');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save attendance');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'present':
+        return <Badge className="bg-green-500">Present</Badge>;
+      case 'absent':
+        return <Badge className="bg-red-500">Absent</Badge>;
+      case 'late':
+        return <Badge className="bg-yellow-500">Late</Badge>;
+      case 'leave':
+        return <Badge className="bg-blue-500">Leave</Badge>;
+      default:
+        return <Badge variant="outline">Not Marked</Badge>;
+    }
+  };
+
+  const getStatusCounts = () => {
+    const counts = {
+      present: 0,
+      absent: 0,
+      late: 0,
+      leave: 0,
+      unmarked: 0,
+    };
+    
+    students.forEach(student => {
+      if (!student.status) {
+        counts.unmarked++;
+      } else {
+        counts[student.status]++;
+      }
+    });
+    
+    return counts;
+  };
+
+  const counts = getStatusCounts();
 
   return (
     <div className="space-y-6">
-      <PageHeader title={title} description={description} />
-      {renderModuleContent()}
+      <PageHeader 
+        title="Mark Attendance" 
+        description="Mark attendance for students manually"
+      />
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Class *</Label>
+              <Select
+                value={selectedClass}
+                onValueChange={(value) => {
+                  setSelectedClass(value);
+                  const classData = classes.find(c => c.id === value);
+                  setSections(classData?.sections || []);
+                  setSelectedSection('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Section</Label>
+              <Select
+                value={selectedSection}
+                onValueChange={setSelectedSection}
+                disabled={!sections.length}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={sections.length ? "Select section" : "No sections"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search students..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                  disabled={!selectedClass}
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Status Summary */}
+      {selectedClass && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-4 items-center justify-between">
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-green-500" />
+                  <span className="text-sm">Present: {counts.present}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-red-500" />
+                  <span className="text-sm">Absent: {counts.absent}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                  <span className="text-sm">Late: {counts.late}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-blue-500" />
+                  <span className="text-sm">Leave: {counts.leave}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-gray-300" />
+                  <span className="text-sm">Unmarked: {counts.unmarked}</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleMarkAll('present')}
+                  className="text-green-600"
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  All Present
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleMarkAll('absent')}
+                  className="text-red-600"
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  All Absent
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Students List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Students
+            {selectedClass && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({filteredStudents.length} students)
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Mark attendance for each student
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!selectedClass ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Please select a class to view students
+            </div>
+          ) : loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No students found
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Roll No.</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Remarks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">
+                        {student.rollNumber}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {student.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={student.status || ''}
+                          onValueChange={(value: any) => 
+                            handleStatusChange(student.id, value)
+                          }
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Select status">
+                              {student.status ? getStatusBadge(student.status) : 'Not marked'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="present">Present</SelectItem>
+                            <SelectItem value="absent">Absent</SelectItem>
+                            <SelectItem value="late">Late</SelectItem>
+                            <SelectItem value="leave">Leave</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Add remarks..."
+                          value={student.remarks || ''}
+                          onChange={(e) => 
+                            handleRemarksChange(student.id, e.target.value)
+                          }
+                          className="max-w-[200px]"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Save Button */}
+          {selectedClass && !loading && (
+            <div className="flex justify-end gap-4 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => router.push('/dashboard/admin/attendance')}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveAttendance}
+                disabled={saving || !selectedClass}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : attendanceMarked ? 'Update Attendance' : 'Save Attendance'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

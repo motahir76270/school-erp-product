@@ -125,11 +125,31 @@ export default function ClassesPage() {
     
     dispatch(setLoading(true));
     try {
-      // Only send classId if it exists
       const data = await getAllSectionsApiCall(token, classId);
       console.log('Sections API Response:', data);
+      
       if (data?.success === true) {
-        const sectionsData = data.data || [];
+        let sectionsData = [];
+        
+        // Handle different response structures
+        if (Array.isArray(data.data)) {
+          // If data is already an array
+          sectionsData = data.data;
+        } else if (data.data && typeof data.data === 'object') {
+          // If data is a single object, convert to array
+          if (data.data.id) {
+            sectionsData = [data.data];
+          } else if (data.data.sections) {
+            // If data has a sections property
+            sectionsData = data.data.sections;
+          } else {
+            sectionsData = [];
+          }
+        } else {
+          sectionsData = [];
+        }
+        
+        console.log('Processed sections data:', sectionsData);
         dispatch(setSections(sectionsData));
       } else {
         toast.error(data?.message || 'Failed to fetch sections');
@@ -163,12 +183,12 @@ export default function ClassesPage() {
     return cls.name.toLowerCase().includes(query);
   });
 
-  // Filter sections by search
-  const filteredSections = sections.filter((section: Section) => {
+  // Filter sections by search - FIXED: Add null check
+  const filteredSections = Array.isArray(sections) ? sections.filter((section: Section) => {
     const query = search.toLowerCase().trim();
     if (!query) return true;
-    return section.name.toLowerCase().includes(query);
-  });
+    return section.name?.toLowerCase().includes(query) || false;
+  }) : [];
 
   // Get class name by ID
   const getClassName = (classId: string) => {
@@ -266,7 +286,9 @@ export default function ClassesPage() {
 
       if (data?.success === true) {
         toast.success(data?.message || 'Section created successfully');
-        dispatch(addSection(data.data));
+        // Handle single section object response
+        const newSection = data.data;
+        dispatch(addSection(newSection));
         setSectionForm({ name: '', capacity: '', classId: '' });
         setIsCreateSectionModalOpen(false);
         await fetchSections(selectedClassId || undefined);
@@ -361,7 +383,7 @@ export default function ClassesPage() {
                 <Layers className="h-4 w-4" />
                 Sections
                 <Badge variant="secondary" className="ml-1">
-                  {sections.length}
+                  {Array.isArray(sections) ? sections.length : 0}
                 </Badge>
               </TabsTrigger>
             </TabsList>
@@ -479,7 +501,7 @@ export default function ClassesPage() {
                           Loading sections...
                         </TableCell>
                       </TableRow>
-                    ) : filteredSections.length === 0 ? (
+                    ) : !Array.isArray(sections) || sections.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No sections found

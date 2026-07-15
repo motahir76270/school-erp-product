@@ -77,7 +77,6 @@ export const markAttendance = async (req, res) => {
         markedBy: markedBy,
         markingMethod: markingMethod,
       })
-      .returning();
 
     if (!newAttendance) {
       return errorResponse(res, "Failed to create attendance record", 500);
@@ -89,15 +88,12 @@ export const markAttendance = async (req, res) => {
       attendanceId: attendanceId,
       studentId: student.studentId,
       status: student.status || "present",
-      checkInTime: student.checkInTime || null,
-      checkOutTime: student.checkOutTime || null,
       remarks: student.remarks || null,
     }));
 
     const insertedLogs = await db
       .insert(attendanceLogs)
       .values(attendanceLogsData)
-      .returning();
 
     return successResponse(
       res,
@@ -122,7 +118,7 @@ export const markAttendance = async (req, res) => {
 // ==================== MARK ATTENDANCE VIA QR CODE ====================
 export const markAttendanceViaQR = async (req, res) => {
   try {
-    const { studentId, date, classId, sectionId, checkInTime } = req.body;
+    const { studentId, date, classId, sectionId } = req.body;
     const markedBy = req.user?.id;
 
     // Validate required fields
@@ -178,7 +174,6 @@ export const markAttendanceViaQR = async (req, res) => {
           markedBy: markedBy,
           markingMethod: "qrcode",
         })
-        .returning();
 
       if (!newAttendance) {
         return errorResponse(res, "Failed to create attendance record", 500);
@@ -205,13 +200,11 @@ export const markAttendanceViaQR = async (req, res) => {
       const [updatedLog] = await db
         .update(attendanceLogs)
         .set({
-          checkInTime: checkInTime || new Date().toTimeString().slice(0, 8),
           status: "present",
           markedAt: new Date(),
         })
         .where(eq(attendanceLogs.id, existingLog[0].id))
-        .returning();
-
+  
       return successResponse(
         res,
         {
@@ -232,10 +225,9 @@ export const markAttendanceViaQR = async (req, res) => {
         attendanceId: attendanceId,
         studentId: studentId,
         status: "present",
-        checkInTime: checkInTime || new Date().toTimeString().slice(0, 8),
         remarks: "Marked via QR code scan",
       })
-      .returning();
+
 
     if (!newLog) {
       return errorResponse(res, "Failed to mark attendance via QR", 500);
@@ -411,7 +403,7 @@ export const getStudentAttendance = async (req, res) => {
 export const updateAttendanceStatus = async (req, res) => {
   try {
     const { logId } = req.params;
-    const { status, checkInTime, checkOutTime, remarks } = req.body;
+    const { status, remarks } = req.body;
 
     if (!logId) {
       return errorResponse(res, "Attendance log ID is required", 400);
@@ -443,16 +435,12 @@ export const updateAttendanceStatus = async (req, res) => {
       status: status,
       updatedAt: new Date(),
     };
-
-    if (checkInTime !== undefined) updateData.checkInTime = checkInTime;
-    if (checkOutTime !== undefined) updateData.checkOutTime = checkOutTime;
     if (remarks !== undefined) updateData.remarks = remarks;
 
     const [updatedLog] = await db
       .update(attendanceLogs)
       .set(updateData)
       .where(eq(attendanceLogs.id, logId))
-      .returning();
 
     if (!updatedLog) {
       return errorResponse(res, "Failed to update attendance status", 500);

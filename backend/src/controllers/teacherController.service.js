@@ -32,53 +32,44 @@ export const createTeacher = async (req, res) => {
       salary,
     } = req.body;
 
-    // Get the admin who is creating this teacher
     const adminId = req.user?.id;
-    const profileImage = req.file;
-     const imagePath = profileImage
-      ? profileImage.path.replace(/\\/g, "/")
-      : null;
 
     if (!adminId) {
       return errorResponse(res, "Unauthorized - Admin ID required", 401);
     }
 
-    // Validate required fields
-    if (!email || !name || !employeeId || !joiningDate) {
+    const profileImage = req.file;
+    const imagePath = profileImage
+      ? profileImage.path.replace(/\\/g, "/")
+      : null;
+
+    if (!email || !name || !username || !employeeId || !joiningDate) {
       return errorResponse(
         res,
-        `Required fields missing: ${
-          !email
-            ? "email"
-            : !name
-              ? "name"
-              : !employeeId
-                ? "employeeId"
-                : "joiningDate"
-        }`,
+        "Email, Name, Username, Employee ID and Joining Date are required",
         400,
       );
     }
 
-    // Check email exists - Using schema property names
-    const existingTeacher = await db
+    // Check email
+    const [existingTeacher] = await db
       .select()
       .from(teachers)
       .where(eq(teachers.email, email))
       .limit(1);
 
-    if (existingTeacher.length > 0) {
+    if (existingTeacher) {
       return errorResponse(res, "Email already registered", 409);
     }
 
-    // Check employee ID exists
-    const existingTeacherByEmployeeId = await db
+    // Check employee ID
+    const [existingEmployee] = await db
       .select()
       .from(teachers)
       .where(eq(teachers.employeeId, employeeId))
       .limit(1);
 
-    if (existingTeacherByEmployeeId.length > 0) {
+    if (existingEmployee) {
       return errorResponse(
         res,
         "Teacher with this employee ID already exists",
@@ -86,41 +77,25 @@ export const createTeacher = async (req, res) => {
       );
     }
 
-    // Generate username
-    let finalUsername = username;
+    // Check username
+    const [existingUsername] = await db
+      .select()
+      .from(teachers)
+      .where(eq(teachers.username, username))
+      .limit(1);
 
-    if (!finalUsername) {
-      let isUnique = false;
-      let attempts = 0;
-
-      while (!isUnique && attempts < 10) {
-        finalUsername = generateDefaultUsername();
-
-        const existingUsername = await db
-          .select()
-          .from(teachers)
-          .where(eq(teachers.username, finalUsername))
-          .limit(1);
-
-        if (existingUsername.length === 0) {
-          isUnique = true;
-        }
-
-        attempts++;
-      }
-
-      if (!isUnique) {
-        return errorResponse(res, "Unable to generate unique username", 500);
-      }
+    if (existingUsername) {
+      return errorResponse(res, "Username already exists", 409);
     }
 
     const teacherId = uuidv4();
+
     const finalPassword = password || "123456";
 
     // Generate QR Code
     const qrData = JSON.stringify({
       id: teacherId,
-      adminId: adminId,
+      userId: adminId,
       name,
       email,
       employeeId,
@@ -132,54 +107,45 @@ export const createTeacher = async (req, res) => {
 
     try {
       qrCodePath = await generateQRCode(qrData, `${teacherId}.png`);
-    } catch (error) {
-      console.error("QR generation failed:", error);
+    } catch (err) {
+      console.error("QR generation failed:", err);
     }
 
-    // Create teacher - Using schema property names
+    // Insert teacher
     await db.insert(teachers).values({
       id: teacherId,
-      userId: adminId, // Admin who created this teacher
-      email: email,
+      userId: adminId,
+      email,
       password: finalPassword,
-      name: name,
-      username: finalUsername,
+      name,
+      username,
       role: "teacher",
-      profileImage: imagePath || null,
-      employeeId: employeeId,
+      profileImage: imagePath,
+      employeeId,
       qualification: qualification || null,
       experience: experience || null,
       specialization: specialization || null,
-      joiningDate: joiningDate,
+      joiningDate,
       salary: salary || null,
       qrCode: qrCodePath,
       isActive: true,
     });
 
-    // Fetch created teacher
     const [newTeacher] = await db
       .select()
       .from(teachers)
       .where(eq(teachers.id, teacherId))
       .limit(1);
 
-    if (!newTeacher) {
-      return errorResponse(res, "Failed to fetch created teacher", 500);
-    }
-
     return successResponse(
       res,
-      {
-        teacher: newTeacher,
-        defaultUsername: finalUsername,
-        defaultPassword: finalPassword,
-      },
+      newTeacher,
       "Teacher created successfully",
       201,
     );
   } catch (error) {
     console.error("Create teacher error:", error);
-    return errorResponse(res, error.message || "Failed to create teacher", 500);
+    return errorResponse(res, "Internal Server Error", 500);
   }
 };
 
@@ -260,7 +226,6 @@ export const teacherLogin = async (req, res) => {
     );
   } catch (error) {
     console.error("Teacher login error:", error);
-
     return errorResponse(res, error.message || "Login failed", 500);
   }
 };
@@ -281,10 +246,9 @@ export const updateTeacher = async (req, res) => {
       experience,
       specialization,
       salary,
-    } = req.body; 
+    } = req.body;
 
     const profileImage = req.file;
-  
 
     // Check if teacher exists
     const [existingTeacher] = await db
@@ -294,28 +258,26 @@ export const updateTeacher = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "sadmfnsamdf,n not found", 404);
     }
 
     // Check if username is unique
     if (username && username !== existingTeacher.username) {
-      const existingTeacherByUsername = await db
+      const [existingTeacherByUsername] = await db
         .select()
         .from(teachers)
         .where(eq(teachers.username, username))
         .limit(1);
 
-      if (existingTeacherByUsername.length > 0) {
+      if (existingTeacherByUsername) {
         return errorResponse(res, "Username already taken", 409);
       }
     }
 
-    // Build update data - Using schema property names
+    // Build update data
     const teacherUpdateData = {};
     if (name !== undefined) teacherUpdateData.name = name;
     if (username !== undefined) teacherUpdateData.username = username;
-    if (profileImage !== undefined)
-      teacherUpdateData.profileImage = profileImage;
     if (qualification !== undefined)
       teacherUpdateData.qualification = qualification;
     if (experience !== undefined) teacherUpdateData.experience = experience;
@@ -323,8 +285,7 @@ export const updateTeacher = async (req, res) => {
       teacherUpdateData.specialization = specialization;
     if (salary !== undefined) teacherUpdateData.salary = salary;
     if (profileImage) {
-      teacherUpdateData.profileImage =
-        profileImage.path.replace(/\\/g, "/");
+      teacherUpdateData.profileImage = profileImage.path.replace(/\\/g, "/");
     }
     teacherUpdateData.updatedAt = new Date();
 
@@ -339,18 +300,6 @@ export const updateTeacher = async (req, res) => {
         qualification: qualification || existingTeacher.qualification,
         specialization: specialization || existingTeacher.specialization,
       });
-
-      try {
-        const qrFileName = `${existingTeacher.id}.png`;
-        const newQRPath = await generateQRCode(qrData, qrFileName);
-        teacherUpdateData.qrCode = newQRPath;
-
-        if (existingTeacher.qrCode) {
-          await deleteQRCodeFile(existingTeacher.qrCode);
-        }
-      } catch (qrError) {
-        console.error("QR Code regeneration failed:", qrError);
-      }
     }
 
     if (Object.keys(teacherUpdateData).length === 0) {
@@ -387,27 +336,34 @@ export const updateTeacher = async (req, res) => {
 };
 
 // ==================== GET ALL TEACHERS ====================
-
 export const getAllTeachers = async (req, res) => {
   try {
-    const id = req.user.id;
+    console.log("dsjfbjsdfgbjfgb");
+    
+    const adminId = req.user?.id;
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = 10;
+    if (!adminId) {
+      return errorResponse(res, "Unauthorized - Admin ID required", 401);
+    }
+    const page = req.query.page ||  req.params.page;
+    const limit =  10;
     const offset = (page - 1) * limit;
 
     // Get teachers for the current page
     const allTeachers = await db
       .select()
       .from(teachers)
+      .where(eq(teachers.userId, adminId))
       .limit(limit)
       .offset(offset);
 
     // Get total count
-    const [{ total }] = await db
+    const [totalResult] = await db
       .select({ total: count() })
       .from(teachers)
-      .where(eq(teachers.userId, id));
+      .where(eq(teachers.userId, adminId));
+
+    const total = totalResult?.total || 0;
 
     return successResponse(
       res,
@@ -417,10 +373,11 @@ export const getAllTeachers = async (req, res) => {
           page,
           limit,
           total,
+          totalPages: Math.ceil(total / limit),
         },
       },
       "Teachers fetched successfully",
-      200
+      200,
     );
   } catch (error) {
     console.error("Get all teachers error:", error);
@@ -444,30 +401,45 @@ export const getTeacherById = async (req, res) => {
       .limit(1);
 
     if (!teacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "sfnaf not found", 404);
     }
 
-        const token = generateToken({
-          id: teacher.id,
-          email: teacher.email,
-          role: teacher.role,
-        });
-    
-            res.cookie("token", token, {
+    // Only generate token if this is a teacher accessing their own profile
+    // or an admin accessing a teacher's details
+    const isTeacher = req.user?.teacherId === id || req.user?.id === id;
+    const isAdmin = req.user?.role === "admin";
+
+    let token = null;
+    if (isTeacher || isAdmin) {
+      token = generateToken({
+        id: teacher.id,
+        email: teacher.email,
+        role: teacher.role,
+        teacherId: teacher.id,
+      });
+
+      // Only set cookie for teacher accessing their own profile
+      if (isTeacher) {
+        res.cookie("token", token, {
           httpOnly: true,
-          secure: false, // true in production with HTTPS
+          secure: process.env.NODE_ENV === "production",
           sameSite: "strict",
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
+      }
+    }
 
-
-    return successResponse(res, {teacher,token}, "Teacher fetched successfully", 200);
+    return successResponse(
+      res,
+      { teacher, ...(token && { token }) },
+      "Teacher fetched successfully",
+      200,
+    );
   } catch (error) {
     console.error("Get teacher error:", error);
     return errorResponse(res, error.message || "Failed to get teacher", 500);
   }
 };
-
 // ==================== GET TEACHER PROFILE ====================
 export const getTeacherProfile = async (req, res) => {
   try {
@@ -484,7 +456,7 @@ export const getTeacherProfile = async (req, res) => {
       .limit(1);
 
     if (!teacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "Tesdksdfher not found", 404);
     }
 
     return successResponse(
@@ -515,7 +487,7 @@ export const updateTeacherProfile = async (req, res) => {
     const { name, username, qualification, experience, specialization } =
       req.body;
 
-    const profileImage = req.file;   
+    const profileImage = req.file;
 
     const [existingTeacher] = await db
       .select()
@@ -524,35 +496,33 @@ export const updateTeacherProfile = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "sfnbfn not found", 404);
     }
 
     if (username && username !== existingTeacher.username) {
-      const existingTeacherByUsername = await db
+      const [existingTeacherByUsername] = await db
         .select()
         .from(teachers)
         .where(eq(teachers.username, username))
         .limit(1);
 
-      if (existingTeacherByUsername.length > 0) {
+      if (existingTeacherByUsername) {
         return errorResponse(res, "Username already taken", 409);
       }
     }
 
-    // Build update data - Using schema property names
+    // Build update data
     const teacherUpdateData = {};
     if (name !== undefined) teacherUpdateData.name = name;
     if (username !== undefined) teacherUpdateData.username = username;
     if (qualification !== undefined)
       teacherUpdateData.qualification = qualification;
     if (experience !== undefined) teacherUpdateData.experience = experience;
-    if (specialization !== undefined) teacherUpdateData.specialization = specialization;
-
+    if (specialization !== undefined)
+      teacherUpdateData.specialization = specialization;
     if (profileImage) {
-      teacherUpdateData.profileImage =
-        profileImage.path.replace(/\\/g, "/");
+      teacherUpdateData.profileImage = profileImage.path.replace(/\\/g, "/");
     }
-
     teacherUpdateData.updatedAt = new Date();
 
     // Regenerate QR code if name or qualification changes
@@ -566,18 +536,6 @@ export const updateTeacherProfile = async (req, res) => {
         qualification: qualification || existingTeacher.qualification,
         specialization: specialization || existingTeacher.specialization,
       });
-
-      try {
-        const qrFileName = `${existingTeacher.id}.png`;
-        const newQRPath = await generateQRCode(qrData, qrFileName);
-        teacherUpdateData.qrCode = newQRPath;
-
-        if (existingTeacher.qrCode) {
-          await deleteQRCodeFile(existingTeacher.qrCode);
-        }
-      } catch (qrError) {
-        console.error("QR Code regeneration failed:", qrError);
-      }
     }
 
     if (Object.keys(teacherUpdateData).length === 0) {
@@ -651,7 +609,7 @@ export const changeTeacherPassword = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "Teacher not fjdsnf", 404);
     }
 
     if (existingTeacher.password !== currentPassword) {
@@ -702,7 +660,7 @@ export const resetTeacherPassword = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "Teacher not dsfnm,f", 404);
     }
 
     const finalPassword = newPassword || "123456";
@@ -741,10 +699,10 @@ export const resetTeacherPassword = async (req, res) => {
 // ==================== DELETE TEACHER (SOFT) ====================
 export const deleteTeacher = async (req, res) => {
   try {
-    const teacherId = req.user?.teacherId || req.user?.id;
+    const teacherId = req.params?.id || req.user?.teacherId || req.user?.id;
 
     if (!teacherId) {
-      return errorResponse(res, "Teacher not authenticated", 401);
+      return errorResponse(res, "Teacher ID is required", 400);
     }
 
     const [existingTeacher] = await db
@@ -754,10 +712,10 @@ export const deleteTeacher = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "Teacher not dfsndsnalskdf", 404);
     }
 
-    // Soft delete - Using schema property names
+    // Soft delete
     await db
       .update(teachers)
       .set({
@@ -789,7 +747,7 @@ export const hardDeleteTeacher = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "dsmfnas,mdnm,sadf not found", 404);
     }
 
     // Delete QR code file
@@ -813,11 +771,16 @@ export const updateTeacherStatus = async (req, res) => {
     const { teacherId } = req.params;
     const { status } = req.body;
 
-    if (!teacherId || !status) {
-      return errorResponse(res, "Teacher ID and status are required", 400);
+    if (!teacherId) {
+      return errorResponse(res, "Teacher ID is required", 400);
     }
 
-    if (!["active", "inactive", "suspended"].includes(status)) {
+    if (!status) {
+      return errorResponse(res, "Status is required", 400);
+    }
+
+    const validStatuses = ["active", "inactive", "suspended"];
+    if (!validStatuses.includes(status.toLowerCase())) {
       return errorResponse(
         res,
         "Invalid status. Must be: active, inactive, suspended",
@@ -832,14 +795,17 @@ export const updateTeacherStatus = async (req, res) => {
       .limit(1);
 
     if (!existingTeacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "ds;flaskl;sdk not found", 404);
     }
 
-    // Update teacher status - Using schema property names
+    // Convert status to boolean
+    const isActive = status.toLowerCase() === "active";
+
+    // Update teacher status
     await db
       .update(teachers)
       .set({
-        isActive: status === "active",
+        isActive: isActive,
         updatedAt: new Date(),
       })
       .where(eq(teachers.id, teacherId));
@@ -853,7 +819,10 @@ export const updateTeacherStatus = async (req, res) => {
 
     return successResponse(
       res,
-      { status: updatedTeacher.isActive ? "active" : "inactive" },
+      {
+        status: updatedTeacher.isActive ? "active" : "inactive",
+        teacher: updatedTeacher,
+      },
       "Teacher status updated successfully",
       200,
     );
@@ -867,13 +836,120 @@ export const updateTeacherStatus = async (req, res) => {
   }
 };
 
+// ==================== UPDATE TEACHER BY ID (ADMIN) ====================
+export const updateTeacherById = async (req, res) => {
+  try {
+    const teacherId = req.params.id;
+
+    if (!teacherId) {
+      return errorResponse(res, "Teacher ID is required", 400);
+    }
+
+    // Ensure req.body exists with fallback
+    const body = req.body || {};
+    const {
+      name,
+      username,
+      qualification,
+      experience,
+      specialization,
+      salary,
+      isActive,
+    } = body;
+
+    const profileImage = req.file;
+
+    // Check if teacher exists
+    const [existingTeacher] = await db
+      .select()
+      .from(teachers)
+      .where(eq(teachers.id, teacherId))
+      .limit(1);
+
+    if (!existingTeacher) {
+      return errorResponse(res, "smdfnafm not found", 404);
+    }
+
+    // Check if username is unique
+    if (username && username !== existingTeacher.username) {
+      const [existingTeacherByUsername] = await db
+        .select()
+        .from(teachers)
+        .where(eq(teachers.username, username))
+        .limit(1);
+
+      if (existingTeacherByUsername) {
+        return errorResponse(res, "Username already taken", 409);
+      }
+    }
+
+    // Build update data
+    const teacherUpdateData = {};
+    if (name !== undefined && name !== null) teacherUpdateData.name = name;
+    if (username !== undefined && username !== null) teacherUpdateData.username = username;
+    if (qualification !== undefined && qualification !== null) teacherUpdateData.qualification = qualification;
+    if (experience !== undefined && experience !== null) teacherUpdateData.experience = experience;
+    if (specialization !== undefined && specialization !== null) teacherUpdateData.specialization = specialization;
+    if (salary !== undefined && salary !== null) teacherUpdateData.salary = salary;
+    if (isActive !== undefined && isActive !== null) teacherUpdateData.isActive = isActive;
+    if (profileImage) {
+      teacherUpdateData.profileImage = profileImage.path.replace(/\\/g, "/");
+    }
+    teacherUpdateData.updatedAt = new Date();
+
+    // Regenerate QR code if important data changes
+    if (name || qualification || specialization) {
+      const qrData = JSON.stringify({
+        id: existingTeacher.id,
+        adminId: existingTeacher.userId,
+        name: name || existingTeacher.name,
+        email: existingTeacher.email,
+        employeeId: existingTeacher.employeeId,
+        qualification: qualification || existingTeacher.qualification,
+        specialization: specialization || existingTeacher.specialization,
+      });
+    }
+
+    if (Object.keys(teacherUpdateData).length === 0) {
+      return errorResponse(res, "No data provided for update", 400);
+    }
+
+    // Update teacher
+    await db
+      .update(teachers)
+      .set(teacherUpdateData)
+      .where(eq(teachers.id, teacherId));
+
+    // Fetch updated teacher
+    const [updatedTeacher] = await db
+      .select()
+      .from(teachers)
+      .where(eq(teachers.id, teacherId))
+      .limit(1);
+
+    if (!updatedTeacher) {
+      return errorResponse(res, "Failed to retrieve updated teacher", 500);
+    }
+
+    return successResponse(
+      res,
+      updatedTeacher,
+      "Teacher updated successfully",
+      200,
+    );
+  } catch (error) {
+    console.error("Update teacher by ID error:", error);
+    return errorResponse(res, error.message || "Failed to update teacher", 500);
+  }
+};
+
 // ==================== GET TEACHER QR CODE ====================
 export const getTeacherQRCode = async (req, res) => {
   try {
-    const teacherId = req.user?.teacherId || req.user?.id;
+    const teacherId = req.params?.id || req.user?.teacherId || req.user?.id;
 
     if (!teacherId) {
-      return errorResponse(res, "Teacher not authenticated", 401);
+      return errorResponse(res, "Teacher ID is required", 401);
     }
 
     const [teacher] = await db
@@ -883,21 +959,25 @@ export const getTeacherQRCode = async (req, res) => {
       .limit(1);
 
     if (!teacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "dfs,mnasm,dn not found", 404);
     }
 
     if (!teacher.qrCode) {
       return errorResponse(res, "QR code not found for this teacher", 404);
     }
 
-    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
-    const qrCodeUrl = `${baseUrl}${teacher.qrCode}`;
+    const qrCodeUrl = `${teacher.qrCode}`;
 
     return successResponse(
       res,
       {
         qrCode: teacher.qrCode,
         qrCodeUrl: qrCodeUrl,
+        teacher: {
+          id: teacher.id,
+          name: teacher.name,
+          employeeId: teacher.employeeId,
+        },
       },
       "QR code fetched successfully",
       200,
@@ -911,10 +991,10 @@ export const getTeacherQRCode = async (req, res) => {
 // ==================== REGENERATE TEACHER QR CODE ====================
 export const regenerateTeacherQRCode = async (req, res) => {
   try {
-    const teacherId = req.user?.teacherId || req.user?.id;
+    const teacherId = req.params?.id || req.user?.teacherId || req.user?.id;
 
     if (!teacherId) {
-      return errorResponse(res, "Teacher not authenticated", 401);
+      return errorResponse(res, "Teacher ID is required", 401);
     }
 
     const [teacher] = await db
@@ -924,7 +1004,7 @@ export const regenerateTeacherQRCode = async (req, res) => {
       .limit(1);
 
     if (!teacher) {
-      return errorResponse(res, "Teacher not found", 404);
+      return errorResponse(res, "smdfnam,nm not found", 404);
     }
 
     const qrData = JSON.stringify({
@@ -966,14 +1046,19 @@ export const regenerateTeacherQRCode = async (req, res) => {
       .where(eq(teachers.id, teacher.id))
       .limit(1);
 
-    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
-    const qrCodeUrl = `${baseUrl}${updatedTeacher.qrCode}`;
+
+    const qrCodeUrl = `${updatedTeacher.qrCode}`;
 
     return successResponse(
       res,
       {
         qrCode: updatedTeacher.qrCode,
         qrCodeUrl: qrCodeUrl,
+        teacher: {
+          id: updatedTeacher.id,
+          name: updatedTeacher.name,
+          employeeId: updatedTeacher.employeeId,
+        },
       },
       "QR code regenerated successfully",
       200,
@@ -987,4 +1072,3 @@ export const regenerateTeacherQRCode = async (req, res) => {
     );
   }
 };
-

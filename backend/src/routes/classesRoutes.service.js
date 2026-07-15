@@ -3,7 +3,7 @@ import { Router } from "express";
 import {
   createClass,
   getAllClassesWithSections,
-  getClassById,
+  getClassWithSections,
   updateClass,
   deleteClass,
   getAllClasses,
@@ -28,7 +28,7 @@ const classRouter = Router();
 
 // Public/Protected routes
 classRouter.get(
-  "/",
+  "/classes-section",
   authMiddleware,
   roleMiddleware(["super_admin", "admin", "teacher"]),
   getAllClassesWithSections,
@@ -40,10 +40,10 @@ classRouter.get(
   getAllClasses,
 );
 classRouter.get(
-  "/:id",
+  "classess/:id",
   authMiddleware,
   roleMiddleware(["super_admin", "admin", "teacher"]),
-  getClassById,
+  getSectionById,
 );
 
 
@@ -80,10 +80,11 @@ classRouter.get(
   "/sections/:id",
   authMiddleware,
   roleMiddleware(["super_admin", "admin", "teacher"]),
-  getSectionById,
+  getClassWithSections,
 );
+
 classRouter.get(
-  "/:classId/sections",
+  "/sectionsByClass",
   authMiddleware,
   roleMiddleware(["super_admin", "admin", "teacher"]),
   getSectionsByClass,

@@ -13,7 +13,7 @@ import {
 
 // Users Table
 export const users = mysqlTable("users", {
-  id: varchar("id", { length: 36 }).primaryKey(),
+  id: varchar("id", { length: 100 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),
@@ -34,9 +34,9 @@ export const users = mysqlTable("users", {
 export const students = mysqlTable("students", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }).notNull(),
-  username: varchar("username", { length: 10 }),
+  username: varchar("username", { length: 40 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  name: varchar("name", { length: 10 }),
+  name: varchar("name", { length: 50 }),
   password: varchar("password", { length: 255 }).default("123456"),
   role: varchar("role", { length: 20 }).default("student"),
   rollNumber: varchar("roll_number", { length: 20 }).notNull(),
@@ -62,9 +62,9 @@ export const students = mysqlTable("students", {
 export const teachers = mysqlTable("teachers", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }).notNull(),
-  username: varchar("username", { length: 10 }),
+  username: varchar("username", { length: 40 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  name: varchar("name", { length: 10 }),
+  name: varchar("name", { length: 50 }),
   role: varchar("role", { length: 20 }).default("teacher"),
   password: varchar("password", { length: 255 }).default("123456"),
   profileImage: varchar("profile_image", { length: 500 }),
@@ -136,9 +136,6 @@ export const attendanceLogs = mysqlTable("attendance_logs", {
   attendanceId: varchar("attendance_id", { length: 36 }).notNull(),
   studentId: varchar("student_id", { length: 36 }).notNull(),
   status: varchar("status", { length: 20 }).notNull(), // present, absent, late, leave
-  checkInTime: time("check_in_time"),
-  checkOutTime: time("check_out_time"),
-  remarks: text("remarks"),
   markedAt: timestamp("marked_at").defaultNow(),
 });
 

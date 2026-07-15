@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { getCurrentUser } from '@/src/hooks/apiCall/auth';
-import { setUser } from '@/src/store/slices/authSlice';
+import { getCurrentUserApiCall, setUser } from '@/src/store/slices/authSlice';
 
 export default function DashboardLayout({
   children,
@@ -32,7 +31,7 @@ export default function DashboardLayout({
         
         if (token) {
           // If token exists, try to get user
-          const response:any = await getCurrentUser(token);
+          const response:any = await getCurrentUserApiCall(token);
           if (response.success === true) {
             dispatch(setUser(response.data));
             setIsAuthenticated(true);

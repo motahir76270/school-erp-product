@@ -628,7 +628,7 @@ export default function TeachersPage() {
                           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted overflow-hidden">
                             {teacher.profileImage ? (
                               <Image
-                                src={`${baseURl}${teacher.profileImage}`}
+                                src={`${baseURl}/${teacher.profileImage}`}
                                 alt={teacher.name}
                                 width={40}
                                 height={40}
@@ -957,7 +957,7 @@ export default function TeachersPage() {
               {currentAvatar && !editAvatarFile && (
                 <div className="flex items-center gap-2">
                   <Image
-                    src={`${baseURl}${currentAvatar}`}
+                    src={`${baseURl}/${currentAvatar}`}
                     alt="Current profile"
                     width={40}
                     height={40}
