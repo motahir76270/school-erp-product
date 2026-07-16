@@ -1,7 +1,7 @@
 // dashboard/admin/attendance/qr-scan/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,6 @@ import {
   AlertCircle, 
   RefreshCw,
   User,
-  Calendar,
   XCircle,
   Loader2
 } from 'lucide-react';
@@ -32,8 +31,7 @@ import { markAttendanceViaQRApiCall } from '@/store/slices/attendanceSlice';
 import { getAllClassWithSections } from '@/store/slices/classSlice';
 import { getAllStudentsApiCall } from '@/store/slices/studentSlice';
 import { format } from 'date-fns';
-import { closeQrScanner, openQrScanner } from '@/src/hooks/qrScanner';
-
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 interface Student {
   id: string;
@@ -74,17 +72,13 @@ export default function QRScanAttendancePage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [isScanning, setIsScanning] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scannerKey, setScannerKey] = useState(0);
   const [scannerReady, setScannerReady] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [lastScannedId, setLastScannedId] = useState<string | null>(null);
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
     fetchClasses();
-    return () => {
-      // Cleanup scanner on unmount
-      closeQrScanner();
-    };
   }, []);
 
   useEffect(() => {
@@ -92,6 +86,64 @@ export default function QRScanAttendancePage() {
       fetchStudents();
     }
   }, [selectedClass, selectedSection]);
+
+  // Initialize scanner when component mounts or scannerKey changes
+  useEffect(() => {
+    if (!selectedClass) return;
+
+    // Clean up previous scanner
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(() => {});
+      scannerRef.current = null;
+    }
+
+    // Create new scanner
+    const scanner = new Html5QrcodeScanner(
+      "reader",
+      {
+        fps: 10,
+        qrbox: {
+          width: 250,
+          height: 250,
+        },
+        rememberLastUsedCamera: true,
+        supportedScanTypes: [0],
+      },
+      false
+    );
+
+    scannerRef.current = scanner;
+
+    const onScanSuccess = (decodedText: string, decodedResult: any) => {
+      console.log("QR Code:", decodedText);
+      
+      // Process the QR code
+      handleQRScan(decodedText);
+      
+      // Stop scanner after successful scan
+      scanner.clear().catch((error) => {
+        console.error("Failed to clear scanner", error);
+      });
+      scannerRef.current = null;
+      setScannerReady(false);
+    };
+
+    const onScanFailure = (error: any) => {
+      // Ignore scan errors
+      console.warn(error);
+    };
+
+    scanner.render(onScanSuccess, onScanFailure);
+    setScannerReady(true);
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {});
+        scannerRef.current = null;
+        setScannerReady(false);
+      }
+    };
+  }, [selectedClass, scannerKey]);
 
   const fetchClasses = async () => {
     try {
@@ -125,61 +177,27 @@ export default function QRScanAttendancePage() {
     }
   };
 
-  // Start QR Scanner
-  const startQRScanner = async () => {
+  // Handle QR scan
+  const handleQRScan = async (decodedText: string) => {
     if (!selectedClass) {
       toast.error('Please select a class first');
+      resetScanner();
       return;
     }
 
-    setCameraError(null);
-    setIsScanning(true);
-    setScannerReady(false);
-
-    try {
-      // Open scanner and wait for result
-      const qrData = await openQrScanner('qr-reader-container');
-      
-      // Scanner opened successfully
-      setScannerReady(true);
-      toast.success('QR Scanner started successfully');
-      
-      // Process the scanned data
-      await processQRCode(qrData);
-    } catch (error: any) {
-      console.error('Error starting QR scanner:', error);
-      setCameraError(error?.message || 'Failed to start camera');
-      toast.error(error?.message || 'Failed to start camera. Please use manual entry.');
-      setIsScanning(false);
-      setScannerReady(false);
-    }
-  };
-
-  // Stop QR Scanner
-  const stopQRScanner = async () => {
-    try {
-      await closeQrScanner();
-      setIsScanning(false);
-      setScannerReady(false);
-      toast.info('QR scanner stopped');
-    } catch (error) {
-      console.error('Error stopping scanner:', error);
-      toast.error('Failed to stop scanner');
-    }
-  };
-
-  // Process QR code
-  const processQRCode = async (decodedText: string) => {
-    if (!selectedClass) {
-      toast.error('Please select a class first');
+    if (isProcessing) {
+      toast.info('Processing...');
       return;
     }
 
+    setIsProcessing(true);
     setIsSubmitting(true);
+
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) {
         toast.error('No authentication token found');
+        resetScanner();
         return;
       }
 
@@ -187,14 +205,17 @@ export default function QRScanAttendancePage() {
       let qrData: QRData | null = null;
       
       try {
-        // Try to parse as JSON
         const parsed = JSON.parse(decodedText);
         if (parsed.id && parsed.name) {
           qrData = parsed;
         }
       } catch {
-        // If not JSON, try to find student by QR code
-        const student = students.find(s => s.qrCode === decodedText);
+        // If not JSON, try to find student by QR code, ID, or roll number
+        const student = students.find(s => 
+          s.qrCode === decodedText || 
+          s.id === decodedText || 
+          s.rollNumber === decodedText
+        );
         if (student) {
           qrData = {
             id: student.id,
@@ -204,40 +225,27 @@ export default function QRScanAttendancePage() {
             admissionNumber: '',
             classId: student.classId,
           };
-        } else {
-          // Try to find student by ID
-          const studentById = students.find(s => s.id === decodedText);
-          if (studentById) {
-            qrData = {
-              id: studentById.id,
-              name: studentById.name,
-              email: studentById.email || '',
-              rollNumber: studentById.rollNumber,
-              admissionNumber: '',
-              classId: studentById.classId,
-            };
-          }
         }
       }
 
       if (!qrData) {
         toast.error('Invalid QR code. Student not found.');
+        resetScanner();
         return;
       }
 
-      // Check if student is in selected class
       if (qrData.classId !== selectedClass) {
         toast.error(`Student "${qrData.name}" is not in the selected class`);
+        resetScanner();
         return;
       }
 
-      // Check if already scanned
       if (scannedStudents.some(s => s.studentId === qrData!.id)) {
         toast.info(`${qrData.name} already marked present`);
+        resetScanner();
         return;
       }
 
-      // Mark attendance
       const response = await markAttendanceViaQRApiCall(token, {
         studentId: qrData.id,
         date,
@@ -256,27 +264,29 @@ export default function QRScanAttendancePage() {
         };
         
         setScannedStudents(prev => [...prev, result]);
-        setLastScannedId(qrData.id);
         toast.success(`✅ ${qrData.name} marked present`);
         
-        // Clear last scanned after 3 seconds
-        setTimeout(() => setLastScannedId(null), 3000);
-
-        // After successful scan, reset scanner state to allow scanning again
-        setScannerReady(false);
-        setIsScanning(false);
-        
-        // Show option to scan next student
-        toast.info('Ready to scan next student. Click "Start Scanner" again.');
+        // Reset scanner to scan next student
+        setTimeout(() => {
+          resetScanner();
+          toast.info('Ready to scan next student');
+        }, 1500);
       } else {
         toast.error(response?.message || 'Failed to mark attendance');
+        resetScanner();
       }
     } catch (error: any) {
       console.error('Error processing QR code:', error);
       toast.error(error?.message || 'Failed to process QR code');
+      resetScanner();
     } finally {
       setIsSubmitting(false);
+      setIsProcessing(false);
     }
+  };
+
+  const resetScanner = () => {
+    setScannerKey(prev => prev + 1);
   };
 
   // Handle manual QR input
@@ -286,7 +296,7 @@ export default function QRScanAttendancePage() {
       toast.error('Please enter QR code');
       return;
     }
-    await processQRCode(qrInput.trim());
+    await handleQRScan(qrInput.trim());
     setQrInput('');
   };
 
@@ -295,15 +305,13 @@ export default function QRScanAttendancePage() {
   };
 
   const handleClassChange = async (value: string) => {
-    // Stop scanner before changing class
-    if (scannerReady || isScanning) {
-      await stopQRScanner();
-    }
     setSelectedClass(value);
     const classData = classes.find(c => c.id === value);
     setSections(classData?.sections || []);
     setSelectedSection('');
     clearScannedStudents();
+    // Reset scanner when class changes
+    setScannerKey(prev => prev + 1);
   };
 
   const getStatusBadge = (status: string) => {
@@ -331,7 +339,7 @@ export default function QRScanAttendancePage() {
       {/* Class Selection */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Date</Label>
               <Input
@@ -365,6 +373,7 @@ export default function QRScanAttendancePage() {
                 onValueChange={(value) => {
                   setSelectedSection(value);
                   clearScannedStudents();
+                  setScannerKey(prev => prev + 1);
                 }}
                 disabled={!sections.length}
               >
@@ -379,33 +388,6 @@ export default function QRScanAttendancePage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2 flex items-end">
-              <div className="flex gap-2 w-full">
-                {!scannerReady ? (
-                  <Button 
-                    className="w-full" 
-                    onClick={startQRScanner}
-                    disabled={!selectedClass || isScanning}
-                  >
-                    {isScanning ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4 mr-2" />
-                    )}
-                    {isScanning ? 'Initializing...' : 'Start Scanner'}
-                  </Button>
-                ) : (
-                  <Button 
-                    variant="destructive" 
-                    className="w-full" 
-                    onClick={stopQRScanner}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Stop Scanner
-                  </Button>
-                )}
-              </div>
             </div>
           </div>
         </CardContent>
@@ -426,56 +408,35 @@ export default function QRScanAttendancePage() {
                   Active
                 </Badge>
               )}
+              {isProcessing && (
+                <Badge className="bg-yellow-500 animate-pulse">
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Processing
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               {scannerReady 
                 ? "Point camera at QR code to mark attendance" 
-                : "Start camera to scan QR codes"}
+                : isProcessing ? "Processing last scan..." : "Scanner ready"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {!selectedClass ? (
               <div className="text-center py-8 text-muted-foreground">
                 <AlertCircle className="h-12 w-12 mx-auto mb-4" />
-                Please select a class first
-              </div>
-            ) : !scannerReady && !isScanning ? (
-              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg">
-                <Camera className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-sm text-muted-foreground mb-2">
-                  Click "Start Scanner" to begin scanning QR codes
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Or use the manual entry below if camera is not available
-                </p>
+                <p className="text-sm">Please select a class first</p>
+                <p className="text-xs mt-2">QR scanner will start after class selection</p>
               </div>
             ) : (
               <div className="relative">
-                <div 
-                  id="qr-reader-container" 
-                  style={{ width: '100%', minHeight: '300px' }}
-                  className="rounded-lg overflow-hidden bg-black"
-                />
-                
-                {isScanning && !scannerReady && (
+                <div id="reader" style={{ width: '100%', minHeight: '300px' }} />
+                {isProcessing && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
                     <div className="text-white text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                      <p>Initializing camera...</p>
+                      <p>Processing...</p>
                     </div>
-                  </div>
-                )}
-
-                {cameraError && (
-                  <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm">
-                    <AlertCircle className="h-4 w-4 inline-block mr-2" />
-                    {cameraError}
-                  </div>
-                )}
-
-                {lastScannedId && (
-                  <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg text-green-800 text-sm animate-in slide-in-from-top duration-200">
-                    ✅ Last scanned: {students.find(s => s.id === lastScannedId)?.name || 'Student'}
                   </div>
                 )}
               </div>

@@ -7,7 +7,7 @@ import {
   updateClass,
   deleteClass,
   getAllClasses,
-} from "../controllers/classesController.service.js"; // Fixed import path
+} from "../controllers/classes/classesController.service.js"; // Fixed import path
 import {
   createSection,
   getAllSections,
@@ -16,7 +16,7 @@ import {
   updateSection,
   deleteSection,
   bulkCreateSections,
-} from "../controllers/sectionController.service.js"; // Fixed import path
+} from "../controllers/classes/sectionController.service.js"; // Fixed import path
 import {
   authMiddleware,
   roleMiddleware,

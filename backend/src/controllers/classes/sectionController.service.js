@@ -1,9 +1,9 @@
 // src/controllers/sectionController.js
 import { and, eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../db/db.js";
-import { sections, classes } from "../db/schema/users.js";
-import { successResponse, errorResponse } from "../lib/response.js";
+import { db } from "../../db/db.js";
+import { sections, classes } from "../../db/schema/users.js";
+import { successResponse, errorResponse } from "../../lib/response.js";
 import { log } from "console";
 
 // ==================== CREATE SECTION ====================

@@ -12,6 +12,7 @@ import mcqReducer from './slices/mcqSlice';
 import settingsReducer from './slices/settingsSlice';
 import libraryReducer from './slices/librarySlice';
 import uiReducer from './slices/uiSlice';
+import subjectsReducer from './slices/subjectsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     settings: settingsReducer,
     library: libraryReducer,
     ui: uiReducer,
+    subjects:subjectsReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

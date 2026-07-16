@@ -8,7 +8,7 @@ import {
   deleteSubject,
   hardDeleteSubject,
   updateSubjectStatus,
-} from "../controllers/subjectController.service.js";
+} from "../controllers/subjects/subjectController.service.js";
 import {
   assignSubjectToClass,
   getSubjectsByClass,
@@ -17,7 +17,7 @@ import {
   removeSubjectFromClass,
   getAllClassSubjects,
   bulkAssignSubjectsToClass,
-} from "../controllers/classSubjectController.service.js";
+} from "../controllers/subjects/classSubjectController.service.js";
 import {
   authMiddleware,
   roleMiddleware,

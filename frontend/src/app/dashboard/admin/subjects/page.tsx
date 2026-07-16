@@ -1,462 +1,809 @@
+// dashboard/admin/subjects/page.tsx
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/layout/page-header';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  BookOpen,
+  Code,
+  CheckCircle,
+  XCircle,
+  MoreVertical,
+  Eye,
+  BookMarked,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'react-toastify';
+import {
+  setLoading,
+  setError,
+  setPagination,
+  clearError,
+} from '@/store/slices/studentSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchStudents } from '@/store/slices/studentSlice';
-import { fetchTeachers } from '@/store/slices/teacherSlice';
-import { fetchClasses, fetchSections, fetchSubjects } from '@/store/slices/classSlice';
-import { fetchAttendanceStats } from '@/store/slices/attendanceSlice';
-import { fetchFees, fetchFeeStats, fetchPayments } from '@/store/slices/feeSlice';
-import { fetchExams } from '@/store/slices/examSlice';
-import { fetchMcqTests } from '@/store/slices/mcqSlice';
-import { fetchBooks, fetchIssues } from '@/store/slices/librarySlice';
-import { fetchNotices, fetchHolidays } from '@/store/slices/noticeSlice';
-import { ArrowRight, Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, DollarSign, FileText, GraduationCap, Library, Settings, Users, Bell, Clock3 } from 'lucide-react';
+import { format } from 'date-fns';
+import { createSubjectApiCall, deleteSubjectApiCall, getSubjectsApiCall, hardDeleteSubjectApiCall, setSubjects, updateSubjectApiCall, updateSubjectStatusApiCall } from '@/src/store/slices/subjectsSlice';
 
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  description: string;
-  icon: React.ElementType;
+interface SubjectFormData {
+  name: string;
+  code: string;
+  type: 'theory' | 'practical';
+  maxMarks: number;
+  passMarks: number;
 }
 
-function MetricCard({ title, value, description, icon: Icon }: MetricCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function getModuleKind(pathname: string) {
-  const route = pathname.toLowerCase();
-  if (route.includes('/students')) return 'students';
-  if (route.includes('/teachers')) return 'teachers';
-  if (route.includes('/classes')) return 'classes';
-  if (route.includes('/attendance')) return 'attendance';
-  if (route.includes('/fees')) return 'fees';
-  if (route.includes('/exams')) return 'exams';
-  if (route.includes('/assignments')) return 'assignments';
-  if (route.includes('/mcq')) return 'mcq';
-  if (route.includes('/library')) return 'library';
-  if (route.includes('/notices')) return 'notices';
-  if (route.includes('/holidays')) return 'holidays';
-  if (route.includes('/events')) return 'events';
-  if (route.includes('/results')) return 'results';
-  if (route.includes('/profile')) return 'profile';
-  if (route.includes('/settings')) return 'settings';
-  if (route.includes('/timetable')) return 'timetable';
-  return 'general';
-}
-
-function getTitle(moduleKind: string, pathname: string) {
-  const slug = pathname.split('/').filter(Boolean).pop() || 'dashboard';
-  const titleMap: Record<string, string> = {
-    students: 'Students',
-    teachers: 'Teachers',
-    classes: 'Classes',
-    attendance: 'Attendance',
-    fees: 'Fees',
-    exams: 'Exams',
-    assignments: 'Assignments',
-    mcq: 'MCQ',
-    library: 'Library',
-    notices: 'Notices',
-    holidays: 'Holidays',
-    events: 'Events',
-    results: 'Results',
-    profile: 'Profile',
-    settings: 'Settings',
-    timetable: 'Timetable',
-    general: slug.replace(/-/g, ' ').replace(/\w/g, (letter) => letter.toUpperCase()),
-  };
-
-  return titleMap[moduleKind] || titleMap.general;
-}
-
-export default function Page() {
-  const pathname = usePathname() || '';
+export default function SubjectsPage() {
+  const router = useRouter();
   const dispatch = useAppDispatch();
-  const studentState = useAppSelector((state) => state.student);
-  const teacherState = useAppSelector((state) => state.teacher);
-  const classState = useAppSelector((state) => state.class);
-  const attendanceState = useAppSelector((state) => state.attendance);
-  const feeState = useAppSelector((state) => state.fee);
-  const examState = useAppSelector((state) => state.exam);
-  const mcqState = useAppSelector((state) => state.mcq);
-  const libraryState = useAppSelector((state) => state.library);
-  const noticeState = useAppSelector((state) => state.notice);
-  const moduleKind = getModuleKind(pathname);
-  const title = getTitle(moduleKind, pathname);
-  const description = `Manage ${title.toLowerCase()} for this dashboard section.`;
+  const { subjects, isLoading, error, pagination } = useAppSelector((state) => state.subjects);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [formData, setFormData] = useState<SubjectFormData>({
+    name: '',
+    code: '',
+    type: 'theory',
+    maxMarks: 100,
+    passMarks: 33,
+  });
+
+  const fetchSubjects = async (page: number = currentPage) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    dispatch(setLoading(true));
+    dispatch(clearError());
+    
+    try {
+      const data = await getSubjectsApiCall(token, {
+        page,
+        limit: 10,
+        status: statusFilter || undefined,
+        type: typeFilter || undefined,
+      });
+      
+      if (data?.success) {
+        dispatch(setSubjects(data.data.subjects || []));
+        dispatch(setPagination(data.data.pagination));
+      } else {
+        toast.error(data?.message || 'Failed to fetch subjects');
+        dispatch(setError(data?.message || 'Failed to fetch subjects'));
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to fetch subjects');
+      dispatch(setError(error?.message || 'Failed to fetch subjects'));
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    fetchSubjects(currentPage);
+  }, [currentPage, statusFilter, typeFilter]);
 
-    switch (moduleKind) {
-      case 'students':
-        dispatch(fetchStudents({ limit: 5 }));
-        break;
-      case 'teachers':
-        dispatch(fetchTeachers({ limit: 5 }));
-        break;
-      case 'classes':
-        dispatch(fetchClasses());
-        dispatch(fetchSections(undefined));
-        dispatch(fetchSubjects());
-        break;
-      case 'attendance':
-        dispatch(fetchAttendanceStats({ date: today }));
-        break;
-      case 'fees':
-        dispatch(fetchFees());
-        dispatch(fetchFeeStats());
-        dispatch(fetchPayments({ status: 'pending' }));
-        break;
-      case 'exams':
-      case 'results':
-        dispatch(fetchExams());
-        break;
-      case 'mcq':
-        dispatch(fetchMcqTests({ status: 'published' }));
-        break;
-      case 'library':
-        dispatch(fetchBooks({}));
-        dispatch(fetchIssues({ status: 'issued' }));
-        break;
-      case 'notices':
-      case 'holidays':
-      case 'events':
-        dispatch(fetchNotices());
-        dispatch(fetchHolidays());
-        break;
-      default:
-        break;
+  // Handle Create Subject
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      setIsSubmitting(false);
+      return;
     }
-  }, [dispatch, moduleKind]);
 
-  const renderModuleContent = () => {
-    switch (moduleKind) {
-      case 'students': {
-        const activeStudents = studentState.students.filter((student) => student.isActive).length;
-        const recentStudents = studentState.students.slice(0, 4);
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total students" value={studentState.students.length} description="Students currently in the store" icon={Users} />
-              <MetricCard title="Active" value={activeStudents} description="Accounts marked active" icon={CheckCircle2} />
-              <MetricCard title="Classes" value={new Set(studentState.students.map((student) => student.classId)).size} description="Distinct class groups" icon={GraduationCap} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent student records</CardTitle>
-                <CardDescription>Live data from the students API slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentStudents.length > 0 ? recentStudents.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{student.user?.firstName} {student.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">Roll {student.rollNumber}</p>
-                    </div>
-                    <Badge variant={student.isActive ? 'success' : 'secondary'}>{student.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </div>
-                )) : <p className="text-sm text-muted-foreground">No students loaded yet.</p>}
-              </CardContent>
-            </Card>
-          </div>
-        );
+    try {
+      const data = await createSubjectApiCall(token, formData);
+      if (data?.success) {
+        toast.success(data?.message || 'Subject created successfully');
+        setIsCreateModalOpen(false);
+        resetForm();
+        fetchSubjects(currentPage);
+      } else {
+        toast.error(data?.message || 'Failed to create subject');
       }
-      case 'teachers': {
-        const activeTeachers = teacherState.teachers.filter((teacher) => teacher.isActive).length;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total teachers" value={teacherState.teachers.length} description="Teachers fetched from the API" icon={GraduationCap} />
-              <MetricCard title="Active" value={activeTeachers} description="Currently active teachers" icon={CheckCircle2} />
-              <MetricCard title="Employees" value={teacherState.teachers.length} description="Ready for roster and profile review" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Teaching staff</CardTitle>
-                <CardDescription>Latest teacher records from the Redux teacher slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {teacherState.teachers.slice(0, 4).map((teacher) => (
-                  <div key={teacher.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{teacher.user?.firstName} {teacher.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{teacher.specialization || 'Teaching staff'}</p>
-                    </div>
-                    <Badge variant="outline">{teacher.employeeId}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'classes': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Classes" value={classState.classes.length} description="Class groups available" icon={BookOpen} />
-              <MetricCard title="Sections" value={classState.sections.length} description="Sections fetched from the API" icon={Users} />
-              <MetricCard title="Subjects" value={classState.subjects.length} description="Subjects in the curriculum" icon={ClipboardList} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Class overview</CardTitle>
-                <CardDescription>Most recent school classes and sections.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {classState.classes.slice(0, 4).map((classItem) => (
-                  <div key={classItem.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{classItem.name}</p>
-                      <p className="text-sm text-muted-foreground">{classItem.description || 'Academic class'}</p>
-                    </div>
-                    <Badge variant="secondary">{classItem.sections?.length || 0} sections</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'attendance': {
-        const stats = attendanceState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <MetricCard title="Present" value={stats.present} description="Present today" icon={CheckCircle2} />
-              <MetricCard title="Absent" value={stats.absent} description="Absentees" icon={Clock3} />
-              <MetricCard title="Late" value={stats.late} description="Late arrivals" icon={CalendarDays} />
-              <MetricCard title="Total" value={stats.total} description="Tracked students" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance snapshot</CardTitle>
-                <CardDescription>Stats from the attendance slice.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Attendance records are available for the current day and can be expanded with detailed views.</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'fees': {
-        const stats = feeState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Collected" value={stats.collected} description="Amount collected" icon={DollarSign} />
-              <MetricCard title="Pending" value={stats.pending} description="Pending payments" icon={Clock3} />
-              <MetricCard title="Fees" value={feeState.fees.length} description="Fee structures configured" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Fee overview</CardTitle>
-                <CardDescription>Recent fee and payment records.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {feeState.fees.slice(0, 4).map((fee) => (
-                  <div key={fee.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{fee.name}</p>
-                      <p className="text-sm text-muted-foreground">{fee.feeType}</p>
-                    </div>
-                    <Badge variant="outline">{fee.amount}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'exams':
-      case 'results': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Exams" value={examState.exams.length} description="Exams in the system" icon={ClipboardList} />
-              <MetricCard title="Results" value={examState.results.length} description="Stored result entries" icon={Award} />
-              <MetricCard title="Marks" value={examState.marks.length} description="Marks records available" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Exam schedule</CardTitle>
-                <CardDescription>Latest exam data returned by the exam slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {examState.exams.slice(0, 4).map((exam) => (
-                  <div key={exam.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{exam.name}</p>
-                      <p className="text-sm text-muted-foreground">{exam.examType}</p>
-                    </div>
-                    <Badge variant="outline">{exam.totalMarks} marks</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'mcq': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Tests" value={mcqState.tests.length} description="MCQ tests published" icon={ClipboardList} />
-              <MetricCard title="Questions" value={mcqState.questions.length} description="Questions loaded" icon={FileText} />
-              <MetricCard title="Leaderboard" value={mcqState.leaderboard.length} description="Leaderboard entries" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>MCQ tests</CardTitle>
-                <CardDescription>Current test set from the MCQ slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {mcqState.tests.slice(0, 4).map((test) => (
-                  <div key={test.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{test.title}</p>
-                      <p className="text-sm text-muted-foreground">{test.totalQuestions} questions • {test.duration} mins</p>
-                    </div>
-                    <Badge variant="secondary">{test.status}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'library': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Books" value={libraryState.books.length} description="Library books available" icon={Library} />
-              <MetricCard title="Available" value={libraryState.books.filter((book) => book.availableCopies > 0).length} description="Books ready to issue" icon={BookOpen} />
-              <MetricCard title="Issues" value={libraryState.issues.length} description="Active book issues" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Library activity</CardTitle>
-                <CardDescription>Books and borrowed records from the library slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {libraryState.books.slice(0, 4).map((book) => (
-                  <div key={book.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-sm text-muted-foreground">{book.author}</p>
-                    </div>
-                    <Badge variant="outline">{book.availableCopies}/{book.totalCopies}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'notices':
-      case 'holidays':
-      case 'events': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Notices" value={noticeState.notices.length} description="Published notices" icon={Bell} />
-              <MetricCard title="Holidays" value={noticeState.holidays.length} description="Calendar events" icon={CalendarDays} />
-              <MetricCard title="Status" value="Live" description="Data from notices and holidays slices" icon={CheckCircle2} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Communication feed</CardTitle>
-                <CardDescription>Recent notices and special days.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {noticeState.notices.slice(0, 4).map((notice) => (
-                  <div key={notice.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{notice.title}</p>
-                      <p className="text-sm text-muted-foreground">{notice.target}</p>
-                    </div>
-                    <Badge variant="secondary">{notice.priority}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      default:
-        return (
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>Use this section to review the latest module data and actions.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">Live dashboard view</Badge>
-                  <Badge variant="outline">Ready for data</Badge>
-                </div>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {['Track the latest records for this section.', 'Use the dashboard tools to manage daily tasks.', 'Review upcoming actions and keep your workflow current.'].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick actions</CardTitle>
-                <CardDescription>Useful next steps for this module.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Review records and assigned users</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Open recent entries and updates</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Plan upcoming activities and deadlines</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Settings className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Adjust module preferences and visibility</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to create subject');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  // Handle Edit Subject
+  const handleEditSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSubject) return;
+    
+    setIsSubmitting(true);
+    
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const data = await updateSubjectApiCall(token, selectedSubject.id, formData);
+      if (data?.success) {
+        toast.success(data?.message || 'Subject updated successfully');
+        setIsEditModalOpen(false);
+        setSelectedSubject(null);
+        resetForm();
+        fetchSubjects(currentPage);
+      } else {
+        toast.error(data?.message || 'Failed to update subject');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update subject');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Delete Subject
+  const handleDeleteSubject = async () => {
+    if (!selectedSubject) return;
+    
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    try {
+      const data = await deleteSubjectApiCall(token, selectedSubject.id);
+      if (data?.success) {
+        toast.success(data?.message || 'Subject deleted successfully');
+        setIsDeleteModalOpen(false);
+        setSelectedSubject(null);
+        fetchSubjects(currentPage);
+      } else {
+        toast.error(data?.message || 'Failed to delete subject');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete subject');
+    }
+  };
+
+  // Handle Hard Delete Subject
+  const handleHardDeleteSubject = async () => {
+    if (!selectedSubject) return;
+    
+    if (!confirm('Are you sure you want to permanently delete this subject? This action cannot be undone.')) {
+      return;
+    }
+    
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    try {
+      const data = await hardDeleteSubjectApiCall(token, selectedSubject.id);
+      if (data?.success) {
+        toast.success(data?.message || 'Subject permanently deleted');
+        setIsDeleteModalOpen(false);
+        setSelectedSubject(null);
+        fetchSubjects(currentPage);
+      } else {
+        toast.error(data?.message || 'Failed to permanently delete subject');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to permanently delete subject');
+    }
+  };
+
+  // Handle Status Toggle
+  const handleStatusToggle = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    try {
+      const data = await updateSubjectStatusApiCall(token, id, newStatus as 'active' | 'inactive');
+      if (data?.success) {
+        toast.success(data?.message || `Subject ${newStatus} successfully`);
+        fetchSubjects(currentPage);
+      } else {
+        toast.error(data?.message || 'Failed to update status');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update status');
+    }
+  };
+
+  const openEditModal = (subject: any) => {
+    setSelectedSubject(subject);
+    setFormData({
+      name: subject.name,
+      code: subject.code,
+      type: subject.type,
+      maxMarks: subject.maxMarks,
+      passMarks: subject.passMarks,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const openDeleteModal = (subject: any) => {
+    setSelectedSubject(subject);
+    setIsDeleteModalOpen(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      code: '',
+      type: 'theory',
+      maxMarks: 100,
+      passMarks: 33,
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500">Active</Badge>;
+      case 'inactive':
+        return <Badge className="bg-red-500">Inactive</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
+    }
+  };
+
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+      case 'theory':
+        return <Badge variant="outline" className="border-blue-500 text-blue-500">Theory</Badge>;
+      case 'practical':
+        return <Badge variant="outline" className="border-purple-500 text-purple-500">Practical</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return format(new Date(dateString), 'dd MMM yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(pagination.total / pagination.limit);
 
   return (
     <div className="space-y-6">
-      <PageHeader title={title} description={description} />
-      {renderModuleContent()}
+      <PageHeader 
+        title="Subjects" 
+        description="Manage all subjects in the system"
+      />
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-2">
+              <Label>Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or code..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    // Implement search if needed
+                  }}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select
+                value={typeFilter}
+                onValueChange={(value) => {
+                  setTypeFilter(value);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="theory">Theory</SelectItem>
+                  <SelectItem value="practical">Practical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 flex items-end">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setStatusFilter('');
+                  setTypeFilter('');
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+              >
+                Reset Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Subjects Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            All Subjects
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              ({pagination.total} subjects)
+            </span>
+          </CardTitle>
+          <CardDescription>
+            View and manage all subjects in the system
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8 text-red-500">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4" />
+              <p>{error}</p>
+              <Button className="mt-4" onClick={() => fetchSubjects(currentPage)}>
+                Try Again
+              </Button>
+            </div>
+          ) : subjects.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <BookOpen className="h-12 w-12 mx-auto mb-4" />
+              <p>No subjects found</p>
+              <Button 
+                className="mt-4" 
+                onClick={() => {
+                  resetForm();
+                  setIsCreateModalOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Subject
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Max Marks</TableHead>
+                      <TableHead>Pass Marks</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subjects.map((subject) => (
+                      <TableRow key={subject.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{subject.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Code className="h-4 w-4 text-muted-foreground" />
+                            {subject.code}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getTypeBadge(subject.type)}</TableCell>
+                        <TableCell>{subject.maxMarks}</TableCell>
+                        <TableCell>{subject.passMarks}</TableCell>
+                        <TableCell>{getStatusBadge(subject.status)}</TableCell>
+                        <TableCell>{formatDate(subject.createdAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditModal(subject)}>
+                                <Edit2 className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusToggle(subject.id, subject.status)}>
+                                {subject.status === 'active' ? (
+                                  <>
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                    Activate
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openDeleteModal(subject)}>
+                                <Trash2 className="mr-2 h-4 w-4 text-red-500" />
+                                <span className="text-red-500">Delete</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {subjects.length} of {pagination.total} subjects
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New Subject</DialogTitle>
+            <DialogDescription>
+              Add a new subject to the system. All fields are required.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubject} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Subject Name *</Label>
+              <Input
+                placeholder="e.g., Mathematics"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject Code *</Label>
+              <Input
+                placeholder="e.g., MATH101"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                required
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Type *</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: 'theory' | 'practical') =>
+                    setFormData({ ...formData, type: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="theory">Theory</SelectItem>
+                    <SelectItem value="practical">Practical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value="active"
+                  disabled
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Max Marks</Label>
+                <Input
+                  type="number"
+                  value={formData.maxMarks}
+                  onChange={(e) => setFormData({ ...formData, maxMarks: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Pass Marks</Label>
+                <Input
+                  type="number"
+                  value={formData.passMarks}
+                  onChange={(e) => setFormData({ ...formData, passMarks: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting ? 'Creating...' : 'Create Subject'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Subject</DialogTitle>
+            <DialogDescription>
+              Update subject information.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubject} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Subject Name *</Label>
+              <Input
+                placeholder="e.g., Mathematics"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject Code *</Label>
+              <Input
+                placeholder="e.g., MATH101"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                required
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Type *</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: 'theory' | 'practical') =>
+                    setFormData({ ...formData, type: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="theory">Theory</SelectItem>
+                    <SelectItem value="practical">Practical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={selectedSubject?.status || 'active'}
+                  onValueChange={(value: 'active' | 'inactive') =>
+                    setSelectedSubject({ ...selectedSubject, status: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Max Marks</Label>
+                <Input
+                  type="number"
+                  value={formData.maxMarks}
+                  onChange={(e) => setFormData({ ...formData, maxMarks: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Pass Marks</Label>
+                <Input
+                  type="number"
+                  value={formData.passMarks}
+                  onChange={(e) => setFormData({ ...formData, passMarks: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedSubject(null);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting ? 'Updating...' : 'Update Subject'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Subject</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this subject?
+            </DialogDescription>
+          </DialogHeader>
+          {selectedSubject && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="font-medium">{selectedSubject.name}</p>
+                <p className="text-sm text-muted-foreground">Code: {selectedSubject.code}</p>
+                <p className="text-sm text-muted-foreground">Type: {selectedSubject.type}</p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setIsDeleteModalOpen(false);
+                    setSelectedSubject(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={handleDeleteSubject}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

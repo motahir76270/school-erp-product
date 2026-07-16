@@ -1,9 +1,9 @@
 
 import { eq ,and, count} from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../db/db.js";
-import { subjects, classSubjects } from "../db/schema/users.js";
-import { successResponse, errorResponse } from "../lib/response.js";
+import { db } from "../../db/db.js";
+import { subjects, classSubjects } from "../../db/schema/users.js";
+import { successResponse, errorResponse } from "../../lib/response.js";
 
 // ==================== CREATE SUBJECT ====================
 export const createSubject = async (req, res) => {

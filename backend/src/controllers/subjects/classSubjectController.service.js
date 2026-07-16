@@ -1,9 +1,9 @@
 // src/controllers/classSubjectController.js
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../db/db.js";
-import { classSubjects, subjects, classes } from "../db/schema/users.js";
-import { successResponse, errorResponse } from "../lib/response.js";
+import { db } from "../../db/db.js";
+import { classSubjects, subjects, classes } from "../../db/schema/users.js";
+import { successResponse, errorResponse } from "../../lib/response.js";
 
 // ==================== ASSIGN SUBJECT TO CLASS ====================
 export const assignSubjectToClass = async (req, res) => {
