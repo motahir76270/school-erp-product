@@ -45,7 +45,7 @@ feesRouter.patch("/fee-types/:id/status", authMiddleware, updateFeeTypeStatus);
 // ==================== STUDENT FEE ROUTES ====================
 feesRouter.post("/student-fees", authMiddleware, assignFeeToStudent);
 feesRouter.post("/student-fees/class/section", authMiddleware, getFeesAssignBySection);
-feesRouter.get("/student-fees", authMiddleware, getAllStudentFees);
+feesRouter.get("/student-fees/all", authMiddleware, getAllStudentFees);
 feesRouter.get("/student-fees/:studentId", authMiddleware, getStudentFeeById);
 feesRouter.get("/student-fees/fees/:studentId", authMiddleware, getStudentFees);
 

@@ -1,0 +1,1 @@
+ALTER TABLE `student_fees` ADD `due_amount` decimal(12,2) DEFAULT '0';

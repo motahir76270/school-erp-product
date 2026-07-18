@@ -1,0 +1,1 @@
+ALTER TABLE `student_fees` DROP COLUMN `user_id`;

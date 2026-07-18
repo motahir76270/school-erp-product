@@ -162,10 +162,12 @@ export const feeTypes = mysqlTable("fee_types", {
 // Student Fees Table
 export const studentFees = mysqlTable("student_fees", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 50 }).notNull(),
   studentId: varchar("student_id", { length: 36 }).notNull(),
   feeTypeId: varchar("fee_type_id", { length: 36 }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   dueDate: date("due_date").notNull(),
+  dueAmount: decimal("due_amount", { precision: 12, scale: 2 }).default("0"),
   paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).default("0"),
   penaltyAmount: decimal("penalty_amount", { precision: 12, scale: 2 }).default(
     "0",
@@ -560,3 +562,39 @@ export const postLikes = mysqlTable("post_like", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+
+
+export const accounts = mysqlTable("accounts", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  AccountNumber: varchar("AccountNumber", { length: 36 }).notNull(),
+  ifsc: varchar("ifsc", { length: 36 }).notNull(),
+  accountName: varchar("account_Name", { length: 36 }).notNull(),
+  bankName: varchar("bank_name", { length: 36 }).notNull(),
+  balance: decimal("balance", {
+    precision: 10,
+    scale: 2,
+  })
+    .notNull()
+    .default("0.00"),
+
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+
+export const accountHistory = mysqlTable("account_hsitory", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  accountId: varchar("account_id", { length: 36 }).notNull(),
+  runningBalance: decimal("running_balance", {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
+  paymentMode: varchar("payment_mode", { length: 86 }).notNull(),
+  txnId: varchar("txn_id", { length: 36 }).notNull(),
+  txnAmount: varchar("txn_amount", { length: 36 }).notNull(),
+  status: varchar("status", { length: 36 }).notNull(),
+  type: varchar("type", { length: 10 }).notNull(), //CREDIT , DEBIT
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}); 

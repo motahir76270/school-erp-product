@@ -1,0 +1,1 @@
+ALTER TABLE `student_fees` ADD `user_id` varchar(50) NOT NULL;

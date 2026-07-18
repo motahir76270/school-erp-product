@@ -108,6 +108,7 @@ export interface ApiResponse<T = any> {
 interface FeeState {
   feeTypes: FeeType[];
   studentFees: StudentFee[];
+  studentFeesCount:any;
   payments: FeePayment[];
   penalties: FeePenalty[];
   currentFeeType: FeeType | null;
@@ -122,6 +123,7 @@ interface FeeState {
 const initialState: FeeState = {
   feeTypes: [],
   studentFees: [],
+  studentFeesCount: [],
   payments: [],
   penalties: [],
   currentFeeType: null,
@@ -174,6 +176,9 @@ const feeSlice = createSlice({
     setStudentFees: (state, action: PayloadAction<StudentFeesResponse>) => {
       state.studentFees = action.payload.fees || [];
       state.pagination = action.payload.pagination || initialState.pagination;
+    },
+    setStudentFeesCount: (state, action: PayloadAction<StudentFeesResponse>) => {
+      state.studentFeesCount = action.payload ;
     },
     setCurrentStudentFee: (state, action: PayloadAction<StudentFee | null>) => {
       state.currentStudentFee = action.payload;
@@ -293,6 +298,7 @@ export const {
   
   // Student Fees
   setStudentFees,
+  setStudentFeesCount,
   setCurrentStudentFee,
   addStudentFee,
   updateStudentFeeInList,
@@ -446,12 +452,10 @@ export const getStudentFeesApiCall = async (
 
 export const getAllStudentFeesApiCall = async (
   token: string, 
-  params: Record<string, any> = {}
 ): Promise<ApiResponse<StudentFeesResponse>> => {
   try {
-    const response = await axios.get<ApiResponse<StudentFeesResponse>>(`${API_BASE_URL}/student-fees`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params,
+    const response = await axios.get(`${API_BASE_URL}/student-fees/all`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
   } catch (error: any) {

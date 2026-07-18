@@ -36,14 +36,17 @@ import {
   paymentGateway,
   postLikes,
   posts,
+  accounts,
+  accountHistory,
 } from "./users.js";
 
 // User relations
-export const usersRelations = relations(users, ({ many,one}) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   notifications: many(notifications),
-  post:many(posts),
-  like:one(postLikes),
+  post: many(posts),
+  like: one(postLikes),
   auditLogs: many(auditLogs),
+  accounts: one(accounts),
 }));
 
 export const postRelation = relations(posts , ({one}) => ({
@@ -470,5 +473,17 @@ export const paymentGatewayRelations = relations(paymentGateway, ({ one }) => ({
   user: one(users, {
     fields: [paymentGateway.userId],
     references: [users.id],
+  }),
+}));
+
+
+export const accountsRelations = relations(accounts, ({ many }) => ({
+  history: many(accountHistory),
+}));
+
+export const accountHistoryRelations = relations(accountHistory, ({ one }) => ({
+  account: one(accounts, {
+    fields: [accountHistory.accountId],
+    references: [accounts.id],
   }),
 }));

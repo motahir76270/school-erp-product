@@ -15,6 +15,7 @@ import {
   setPenalties,
   setLoading,
   setError,
+  setStudentFeesCount,
 } from '@/store/slices/feeSlice';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,8 +65,9 @@ interface DashboardStats {
 export default function FeeDashboard() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { feeTypes, studentFees, payments, penalties, loading } = useAppSelector((state) => state.fee);
-  
+  const { feeTypes, studentFeesCount, payments, penalties, loading } = useAppSelector((state) => state.fee);
+    console.log(studentFeesCount);
+    
   const [stats, setStats] = useState<DashboardStats>({
     totalFees: 0,
     collectedFees: 0,
@@ -90,95 +92,12 @@ export default function FeeDashboard() {
     dispatch(setLoading(true));
     try {
       // Fetch all data
-      const [feeTypesRes, studentFeesRes, paymentsRes, penaltiesRes] = await Promise.all([
-        getAllFeeTypesApiCall(token, { limit: 100 }),
-        getAllStudentFeesApiCall(token, { limit: 100 }),
-        getAllPaymentsApiCall(token, { limit: 100 }),
-        getAllPenaltiesApiCall(token, { limit: 100 }),
-      ]);
-
-      if (feeTypesRes?.success) {
-        dispatch(setFeeTypes(feeTypesRes.data));
-      }
-      if (studentFeesRes?.success) {
-        dispatch(setStudentFees(studentFeesRes.data));
-      }
-      if (paymentsRes?.success) {
-        dispatch(setPayments(paymentsRes.data));
-      }
-      if (penaltiesRes?.success) {
-        dispatch(setPenalties(penaltiesRes.data));
-      }
-
-      // Calculate stats
-      const fees = studentFeesRes?.data?.fees || [];
-      const payList = paymentsRes?.data?.payments || [];
-      const penList = penaltiesRes?.data?.penalties || [];
-
-      const totalFees = fees.reduce((sum: number, f: any) => sum + parseFloat(f.amount), 0);
-      const collectedFees = payList.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const pendingFees = fees
-        .filter((f: any) => f.status === 'pending' || f.status === 'partial')
-        .reduce((sum: number, f: any) => sum + (parseFloat(f.amount) - parseFloat(f.paidAmount || 0)), 0);
-      const overdueFees = fees
-        .filter((f: any) => f.status === 'overdue')
-        .reduce((sum: number, f: any) => sum + parseFloat(f.amount), 0);
-      const totalPenalties = penList.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const collectionRate = totalFees > 0 ? (collectedFees / totalFees) * 100 : 0;
-
-      setStats({
-        totalFees,
-        collectedFees,
-        pendingFees,
-        overdueFees,
-        totalStudents: fees.length,
-        totalPayments: payList.length,
-        totalPenalties,
-        collectionRate,
-      });
-
-      // Monthly payment data
-      const monthlyPayments = payList.reduce((acc: any, p: any) => {
-        const month = new Date(p.createdAt).toLocaleString('default', { month: 'short' });
-        acc[month] = (acc[month] || 0) + parseFloat(p.amount);
-        return acc;
-      }, {});
-
-      setMonthlyData(
-        Object.keys(monthlyPayments).map((month) => ({
-          month,
-          amount: monthlyPayments[month],
-        }))
-      );
-
-      // Fee type distribution
-      const feeTypeDistribution = fees.reduce((acc: any, f: any) => {
-        const type = feeTypesRes?.data?.feeTypes?.find((t: any) => t.id === f.feeTypeId);
-        const name = type?.name || 'Unknown';
-        acc[name] = (acc[name] || 0) + parseFloat(f.amount);
-        return acc;
-      }, {});
-
-      setFeeTypeData(
-        Object.keys(feeTypeDistribution).map((name) => ({
-          name,
-          value: feeTypeDistribution[name],
-        }))
-      );
-
-      // Status distribution
-      const statusDistribution = fees.reduce((acc: any, f: any) => {
-        acc[f.status] = (acc[f.status] || 0) + 1;
-        return acc;
-      }, {});
-
-      setStatusData(
-        Object.keys(statusDistribution).map((status) => ({
-          name: status.charAt(0).toUpperCase() + status.slice(1),
-          value: statusDistribution[status],
-        }))
-      );
-
+      const res:any = await  getAllStudentFeesApiCall(token)
+        if(res?.success === true){
+          dispatch(setStudentFeesCount(res?.data))
+        }else{
+          toast.error("Failed", res?.message)
+        }
     } catch (error: any) {
       console.error('Fetch dashboard error:', error);
       toast.error(error?.response?.data?.message || 'Failed to fetch dashboard data');
@@ -227,28 +146,28 @@ export default function FeeDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Fees"
-          value={stats.totalFees}
+          value={studentFeesCount.totalFees}
           icon={DollarSign}
           color="bg-blue-500"
           description={`${feeTypes.length} fee types`}
         />
         <StatCard
           title="Collected"
-          value={stats.collectedFees}
+          value={studentFeesCount.collectedAmount}
           icon={CreditCard}
           color="bg-green-500"
-          description={`${stats.collectionRate.toFixed(1)}% collection rate`}
+          description={`${studentFeesCount.collectedAmount}% collection rate`}
         />
         <StatCard
           title="Pending"
-          value={stats.pendingFees}
+          value={studentFeesCount.pendingAmount}
           icon={AlertCircle}
           color="bg-yellow-500"
-          description={`${stats.totalStudents} students`}
+          description={`${studentFeesCount.pendingAmount} students`}
         />
         <StatCard
           title="Overdue"
-          value={stats.overdueFees}
+          value={studentFeesCount.overdueAmount}
           icon={TrendingUp}
           color="bg-red-500"
           description={`₹${stats.totalPenalties.toFixed(2)} penalties`}
