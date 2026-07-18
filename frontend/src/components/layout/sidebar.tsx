@@ -65,6 +65,7 @@ const menuItems = {
     { icon: Library, label: 'Library', href: '/dashboard/admin/library' },
     { icon: FileText, label: 'Notices', href: '/dashboard/admin/notices' },
     { icon: Bell, label: 'Events', href: '/dashboard/admin/events' },
+    { icon: Bell, label: 'post', href: '/dashboard/admin/post' },
     { icon: Settings, label: 'Settings', href: '/dashboard/admin/settings' },
   ],
   teacher: [

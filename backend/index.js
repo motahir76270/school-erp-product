@@ -10,6 +10,8 @@ import teacherRouter from "./src/routes/teacherRoutes.service.js";
 import classRouter from "./src/routes/classesRoutes.service.js";
 import attendanceRouter from "./src/routes/attendanceRoutes.service.js";
 import subjectRouter from "./src/routes/subjectRoutes.service.js";
+import postRouter from "./src/routes/post/postAndLikeRoutes.service.js";
+import feesRouter from "./src/routes/fees/feesRoutes.service.js";
 
 dotenv.config();
 const app = express();
@@ -43,6 +45,8 @@ app.use("/api/teachers", teacherRouter);
 app.use("/api/classes", classRouter);
 app.use("/api/attendance", attendanceRouter);
 app.use("/api/subjects", subjectRouter);
+app.use('/api/posts', postRouter)
+app.use('/api/fees', feesRouter)
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

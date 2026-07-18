@@ -21,6 +21,8 @@ const storage = multer.diskStorage({
       cb(null, "uploads/profile/");
     } else if (file.fieldname === "qrcode") {
       cb(null, "uploads/qrcode/");
+    }else if(file.fieldname === "post"){
+      cb(null, "uploads/posts/");
     } else {
       cb(null, "uploads/");
     }

@@ -107,7 +107,7 @@ const studentSlice = createSlice({
   name: 'student',
   initialState,
   reducers: {
-    setStudents: (state, action: PayloadAction<Student[]>) => {
+    setStudents: (state, action) => {
       state.students = action.payload;
     },
     setCurrentStudent: (state, action: PayloadAction<Student | null>) => {

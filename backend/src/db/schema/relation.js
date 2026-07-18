@@ -34,13 +34,31 @@ import {
   teacherSalaries,
   permission,
   paymentGateway,
+  postLikes,
+  posts,
 } from "./users.js";
 
 // User relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many,one}) => ({
   notifications: many(notifications),
+  post:many(posts),
+  like:one(postLikes),
   auditLogs: many(auditLogs),
 }));
+
+export const postRelation = relations(posts , ({one}) => ({
+   user:one(users , {
+    fields: [posts.userId],
+    references: [users.id],
+   }),
+}) )
+
+export const postLikeRlation = relations(postLikes,({one}) => ({
+   user:one(users, {
+    fields: [postLikes.userId],
+    references:[users.id]
+   })
+}))
 
 // Student relations
 export const studentsRelations = relations(students, ({ one, many }) => ({

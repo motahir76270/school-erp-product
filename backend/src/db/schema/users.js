@@ -142,6 +142,7 @@ export const attendanceLogs = mysqlTable("attendance_logs", {
 // Fee Types Table
 export const feeTypes = mysqlTable("fee_types", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  userId:varchar("user_id",{length:50}).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   code: varchar("code", { length: 20 }).notNull().unique(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
@@ -532,4 +533,30 @@ export const paymentGateway = mysqlTable("payment_gateway", {
   callBackUrl: varchar("callback_url", { length: 120 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+export const posts = mysqlTable("post", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  image: varchar("image", { length: 500 }),
+  likes:int("likes").default(0),
+  createdAt: timestamp("created_at")
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const postLikes = mysqlTable("post_like", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+
+  postId: varchar("post_id", { length: 36 }).notNull(),
+
+  userId: varchar("user_id", { length: 36 }).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });

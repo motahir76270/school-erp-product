@@ -1,462 +1,496 @@
+// dashboard/admin/fee/collect/page.tsx
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHeader } from '@/components/layout/page-header';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchStudents } from '@/store/slices/studentSlice';
-import { fetchTeachers } from '@/store/slices/teacherSlice';
-import { fetchClasses, fetchSections, fetchSubjects } from '@/store/slices/classSlice';
-import { fetchAttendanceStats } from '@/store/slices/attendanceSlice';
-import { fetchFees, fetchFeeStats, fetchPayments } from '@/store/slices/feeSlice';
-import { fetchExams } from '@/store/slices/examSlice';
-import { fetchMcqTests } from '@/store/slices/mcqSlice';
-import { fetchBooks, fetchIssues } from '@/store/slices/librarySlice';
-import { fetchNotices, fetchHolidays } from '@/store/slices/noticeSlice';
-import { ArrowRight, Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, DollarSign, FileText, GraduationCap, Library, Settings, Users, Bell, Clock3 } from 'lucide-react';
+import {
+  getAllStudentFeesApiCall,
+  makePaymentApiCall,
+  setStudentFees,
+  setLoading,
+  setError,
+} from '@/store/slices/feeSlice';
+import { PageHeader } from '@/components/layout/page-header';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'react-toastify';
+import { ArrowLeft, CreditCard, Search, RefreshCw } from 'lucide-react';
 
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  description: string;
-  icon: React.ElementType;
-}
+// ==================== Zod Schema ====================
+const collectFeeSchema = z.object({
+  studentFeeId: z.string().min(1, 'Please select a fee'),
+  amount: z
+    .string()
+    .min(1, 'Amount is required')
+    .refine((val) => parseFloat(val) > 0, {
+      message: 'Amount must be greater than 0',
+    }),
+  paymentMode: z.string().min(1, 'Payment mode is required'),
+  transactionId: z.string().optional(),
+  remarks: z.string().optional(),
+});
 
-function MetricCard({ title, value, description, icon: Icon }: MetricCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
+type CollectFeeFormData = z.infer<typeof collectFeeSchema>;
 
-function getModuleKind(pathname: string) {
-  const route = pathname.toLowerCase();
-  if (route.includes('/students')) return 'students';
-  if (route.includes('/teachers')) return 'teachers';
-  if (route.includes('/classes')) return 'classes';
-  if (route.includes('/attendance')) return 'attendance';
-  if (route.includes('/fees')) return 'fees';
-  if (route.includes('/exams')) return 'exams';
-  if (route.includes('/assignments')) return 'assignments';
-  if (route.includes('/mcq')) return 'mcq';
-  if (route.includes('/library')) return 'library';
-  if (route.includes('/notices')) return 'notices';
-  if (route.includes('/holidays')) return 'holidays';
-  if (route.includes('/events')) return 'events';
-  if (route.includes('/results')) return 'results';
-  if (route.includes('/profile')) return 'profile';
-  if (route.includes('/settings')) return 'settings';
-  if (route.includes('/timetable')) return 'timetable';
-  return 'general';
-}
+// ==================== Component ====================
+export default function CollectFeePage() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { studentFees, loading } = useAppSelector((state) => state.fee);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFee, setSelectedFee] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
 
-function getTitle(moduleKind: string, pathname: string) {
-  const slug = pathname.split('/').filter(Boolean).pop() || 'dashboard';
-  const titleMap: Record<string, string> = {
-    students: 'Students',
-    teachers: 'Teachers',
-    classes: 'Classes',
-    attendance: 'Attendance',
-    fees: 'Fees',
-    exams: 'Exams',
-    assignments: 'Assignments',
-    mcq: 'MCQ',
-    library: 'Library',
-    notices: 'Notices',
-    holidays: 'Holidays',
-    events: 'Events',
-    results: 'Results',
-    profile: 'Profile',
-    settings: 'Settings',
-    timetable: 'Timetable',
-    general: slug.replace(/-/g, ' ').replace(/\w/g, (letter) => letter.toUpperCase()),
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<CollectFeeFormData>({
+    resolver: zodResolver(collectFeeSchema),
+    defaultValues: {
+      paymentMode: 'cash',
+      amount: '',
+    },
+  });
+
+  const watchStudentFeeId = watch('studentFeeId');
+
+  // Update selected fee and amount when fee is selected
+  useEffect(() => {
+    if (watchStudentFeeId) {
+      const fee:any = studentFees.find((f: any) => f.id === watchStudentFeeId);
+      setSelectedFee(fee);
+      if (fee) {
+        const remaining = parseFloat(fee.amount) - parseFloat(fee.paidAmount || 0);
+        setValue('amount', remaining > 0 ? remaining.toString() : '0');
+      }
+    } else {
+      setSelectedFee(null);
+    }
+  }, [watchStudentFeeId, studentFees, setValue]);
+
+  // Fetch pending fees
+  const fetchFees = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    setIsFetching(true);
+    dispatch(setLoading(true));
+    try {
+      const response = await getAllStudentFeesApiCall(token, {
+        status: 'pending,partial,overdue',
+        limit: 100,
+      });
+
+      console.log('Fetch fees response:', response);
+
+      if (response?.success) {
+        const feesData = response.data?.fees || [];
+        dispatch(setStudentFees({ 
+          fees: feesData, 
+          pagination: response.data?.pagination || { page: 1, limit: 10, total: 0 } 
+        }));
+        toast.success(`Loaded ${feesData.length} pending fees`);
+      } else {
+        toast.error(response?.message || 'Failed to fetch fees');
+        dispatch(setStudentFees({ fees: [], pagination: { page: 1, limit: 10, total: 0 } }));
+        dispatch(setError(response?.message || 'Failed to fetch fees'));
+      }
+    } catch (error: any) {
+      console.error('Fetch fees error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to fetch fees');
+      dispatch(setError(error?.response?.data?.message || 'Failed to fetch fees'));
+      dispatch(setStudentFees({ fees: [], pagination: { page: 1, limit: 10, total: 0 } }));
+    } finally {
+      dispatch(setLoading(false));
+      setIsFetching(false);
+    }
   };
 
-  return titleMap[moduleKind] || titleMap.general;
-}
-
-export default function Page() {
-  const pathname = usePathname() || '';
-  const dispatch = useAppDispatch();
-  const studentState = useAppSelector((state) => state.student);
-  const teacherState = useAppSelector((state) => state.teacher);
-  const classState = useAppSelector((state) => state.class);
-  const attendanceState = useAppSelector((state) => state.attendance);
-  const feeState = useAppSelector((state) => state.fee);
-  const examState = useAppSelector((state) => state.exam);
-  const mcqState = useAppSelector((state) => state.mcq);
-  const libraryState = useAppSelector((state) => state.library);
-  const noticeState = useAppSelector((state) => state.notice);
-  const moduleKind = getModuleKind(pathname);
-  const title = getTitle(moduleKind, pathname);
-  const description = `Manage ${title.toLowerCase()} for this dashboard section.`;
-
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    fetchFees();
+  }, []);
 
-    switch (moduleKind) {
-      case 'students':
-        dispatch(fetchStudents({ limit: 5 }));
-        break;
-      case 'teachers':
-        dispatch(fetchTeachers({ limit: 5 }));
-        break;
-      case 'classes':
-        dispatch(fetchClasses());
-        dispatch(fetchSections(undefined));
-        dispatch(fetchSubjects());
-        break;
-      case 'attendance':
-        dispatch(fetchAttendanceStats({ date: today }));
-        break;
-      case 'fees':
-        dispatch(fetchFees());
-        dispatch(fetchFeeStats());
-        dispatch(fetchPayments({ status: 'pending' }));
-        break;
-      case 'exams':
-      case 'results':
-        dispatch(fetchExams());
-        break;
-      case 'mcq':
-        dispatch(fetchMcqTests({ status: 'published' }));
-        break;
-      case 'library':
-        dispatch(fetchBooks({}));
-        dispatch(fetchIssues({ status: 'issued' }));
-        break;
-      case 'notices':
-      case 'holidays':
-      case 'events':
-        dispatch(fetchNotices());
-        dispatch(fetchHolidays());
-        break;
-      default:
-        break;
-    }
-  }, [dispatch, moduleKind]);
+  // Filter fees by search term
+  const filteredFees = Array.isArray(studentFees) ? studentFees.filter((fee: any) => {
+    const search = searchTerm.toLowerCase().trim();
+    if (!search) return true;
+    return (
+      fee.student?.name?.toLowerCase().includes(search) ||
+      fee.student?.admissionNumber?.toLowerCase().includes(search) ||
+      fee.student?.rollNumber?.toLowerCase().includes(search) ||
+      fee.feeType?.name?.toLowerCase().includes(search) ||
+      fee.feeType?.code?.toLowerCase().includes(search)
+    );
+  }) : [];
 
-  const renderModuleContent = () => {
-    switch (moduleKind) {
-      case 'students': {
-        const activeStudents = studentState.students.filter((student) => student.isActive).length;
-        const recentStudents = studentState.students.slice(0, 4);
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total students" value={studentState.students.length} description="Students currently in the store" icon={Users} />
-              <MetricCard title="Active" value={activeStudents} description="Accounts marked active" icon={CheckCircle2} />
-              <MetricCard title="Classes" value={new Set(studentState.students.map((student) => student.classId)).size} description="Distinct class groups" icon={GraduationCap} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent student records</CardTitle>
-                <CardDescription>Live data from the students API slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentStudents.length > 0 ? recentStudents.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{student.user?.firstName} {student.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">Roll {student.rollNumber}</p>
-                    </div>
-                    <Badge variant={student.isActive ? 'success' : 'secondary'}>{student.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </div>
-                )) : <p className="text-sm text-muted-foreground">No students loaded yet.</p>}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'teachers': {
-        const activeTeachers = teacherState.teachers.filter((teacher) => teacher.isActive).length;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Total teachers" value={teacherState.teachers.length} description="Teachers fetched from the API" icon={GraduationCap} />
-              <MetricCard title="Active" value={activeTeachers} description="Currently active teachers" icon={CheckCircle2} />
-              <MetricCard title="Employees" value={teacherState.teachers.length} description="Ready for roster and profile review" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Teaching staff</CardTitle>
-                <CardDescription>Latest teacher records from the Redux teacher slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {teacherState.teachers.slice(0, 4).map((teacher) => (
-                  <div key={teacher.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{teacher.user?.firstName} {teacher.user?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{teacher.specialization || 'Teaching staff'}</p>
-                    </div>
-                    <Badge variant="outline">{teacher.employeeId}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'classes': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Classes" value={classState.classes.length} description="Class groups available" icon={BookOpen} />
-              <MetricCard title="Sections" value={classState.sections.length} description="Sections fetched from the API" icon={Users} />
-              <MetricCard title="Subjects" value={classState.subjects.length} description="Subjects in the curriculum" icon={ClipboardList} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Class overview</CardTitle>
-                <CardDescription>Most recent school classes and sections.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {classState.classes.slice(0, 4).map((classItem) => (
-                  <div key={classItem.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{classItem.name}</p>
-                      <p className="text-sm text-muted-foreground">{classItem.description || 'Academic class'}</p>
-                    </div>
-                    <Badge variant="secondary">{classItem.sections?.length || 0} sections</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'attendance': {
-        const stats = attendanceState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <MetricCard title="Present" value={stats.present} description="Present today" icon={CheckCircle2} />
-              <MetricCard title="Absent" value={stats.absent} description="Absentees" icon={Clock3} />
-              <MetricCard title="Late" value={stats.late} description="Late arrivals" icon={CalendarDays} />
-              <MetricCard title="Total" value={stats.total} description="Tracked students" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance snapshot</CardTitle>
-                <CardDescription>Stats from the attendance slice.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Attendance records are available for the current day and can be expanded with detailed views.</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'fees': {
-        const stats = feeState.stats;
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Collected" value={stats.collected} description="Amount collected" icon={DollarSign} />
-              <MetricCard title="Pending" value={stats.pending} description="Pending payments" icon={Clock3} />
-              <MetricCard title="Fees" value={feeState.fees.length} description="Fee structures configured" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Fee overview</CardTitle>
-                <CardDescription>Recent fee and payment records.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {feeState.fees.slice(0, 4).map((fee) => (
-                  <div key={fee.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{fee.name}</p>
-                      <p className="text-sm text-muted-foreground">{fee.feeType}</p>
-                    </div>
-                    <Badge variant="outline">{fee.amount}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'exams':
-      case 'results': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Exams" value={examState.exams.length} description="Exams in the system" icon={ClipboardList} />
-              <MetricCard title="Results" value={examState.results.length} description="Stored result entries" icon={Award} />
-              <MetricCard title="Marks" value={examState.marks.length} description="Marks records available" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Exam schedule</CardTitle>
-                <CardDescription>Latest exam data returned by the exam slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {examState.exams.slice(0, 4).map((exam) => (
-                  <div key={exam.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{exam.name}</p>
-                      <p className="text-sm text-muted-foreground">{exam.examType}</p>
-                    </div>
-                    <Badge variant="outline">{exam.totalMarks} marks</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'mcq': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Tests" value={mcqState.tests.length} description="MCQ tests published" icon={ClipboardList} />
-              <MetricCard title="Questions" value={mcqState.questions.length} description="Questions loaded" icon={FileText} />
-              <MetricCard title="Leaderboard" value={mcqState.leaderboard.length} description="Leaderboard entries" icon={Users} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>MCQ tests</CardTitle>
-                <CardDescription>Current test set from the MCQ slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {mcqState.tests.slice(0, 4).map((test) => (
-                  <div key={test.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{test.title}</p>
-                      <p className="text-sm text-muted-foreground">{test.totalQuestions} questions • {test.duration} mins</p>
-                    </div>
-                    <Badge variant="secondary">{test.status}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'library': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Books" value={libraryState.books.length} description="Library books available" icon={Library} />
-              <MetricCard title="Available" value={libraryState.books.filter((book) => book.availableCopies > 0).length} description="Books ready to issue" icon={BookOpen} />
-              <MetricCard title="Issues" value={libraryState.issues.length} description="Active book issues" icon={FileText} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Library activity</CardTitle>
-                <CardDescription>Books and borrowed records from the library slice.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {libraryState.books.slice(0, 4).map((book) => (
-                  <div key={book.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-sm text-muted-foreground">{book.author}</p>
-                    </div>
-                    <Badge variant="outline">{book.availableCopies}/{book.totalCopies}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      case 'notices':
-      case 'holidays':
-      case 'events': {
-        return (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard title="Notices" value={noticeState.notices.length} description="Published notices" icon={Bell} />
-              <MetricCard title="Holidays" value={noticeState.holidays.length} description="Calendar events" icon={CalendarDays} />
-              <MetricCard title="Status" value="Live" description="Data from notices and holidays slices" icon={CheckCircle2} />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Communication feed</CardTitle>
-                <CardDescription>Recent notices and special days.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {noticeState.notices.slice(0, 4).map((notice) => (
-                  <div key={notice.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{notice.title}</p>
-                      <p className="text-sm text-muted-foreground">{notice.target}</p>
-                    </div>
-                    <Badge variant="secondary">{notice.priority}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-      default:
-        return (
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>Use this section to review the latest module data and actions.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">Live dashboard view</Badge>
-                  <Badge variant="outline">Ready for data</Badge>
-                </div>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {['Track the latest records for this section.', 'Use the dashboard tools to manage daily tasks.', 'Review upcoming actions and keep your workflow current.'].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick actions</CardTitle>
-                <CardDescription>Useful next steps for this module.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Review records and assigned users</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Open recent entries and updates</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Plan upcoming activities and deadlines</span>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Settings className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Adjust module preferences and visibility</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+  // Handle payment submission
+  const onSubmit = async (data: CollectFeeFormData) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
     }
+
+    // Validate amount
+    const amount = parseFloat(data.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    // Check if amount exceeds remaining balance
+    if (selectedFee) {
+      const remaining = parseFloat(selectedFee.amount) - parseFloat(selectedFee.paidAmount || 0);
+      if (amount > remaining) {
+        toast.error(`Amount cannot exceed remaining balance of ₹${remaining.toFixed(2)}`);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await makePaymentApiCall(token, {
+        studentFeeId: data.studentFeeId,
+        amount: data.amount,
+        paymentMode: data.paymentMode as any,
+        transactionId: data.transactionId || undefined,
+        remarks: data.remarks || undefined,
+      });
+
+      console.log('Payment response:', response);
+
+      if (response?.success) {
+        toast.success(response.message || 'Payment recorded successfully');
+        // Reset form
+        reset({
+          studentFeeId: '',
+          amount: '',
+          paymentMode: 'cash',
+          transactionId: '',
+          remarks: '',
+        });
+        setSelectedFee(null);
+        // Refresh fees
+        await fetchFees();
+        // Navigate to receipts or stay
+        router.push('/admin/fee/receipts');
+      } else {
+        toast.error(response?.message || 'Failed to record payment');
+      }
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to record payment');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Get status badge variant
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, string> = {
+      pending: 'bg-yellow-500 hover:bg-yellow-600',
+      partial: 'bg-blue-500 hover:bg-blue-600',
+      paid: 'bg-green-500 hover:bg-green-600',
+      overdue: 'bg-red-500 hover:bg-red-600',
+    };
+    return variants[status] || 'bg-gray-500 hover:bg-gray-600';
+  };
+
+  // Get status label
+  const getStatusLabel = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader title={title} description={description} />
-      {renderModuleContent()}
+      <PageHeader 
+        title="Collect Fee" 
+        description="Record fee payments from students"
+      />
+ 
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Left Column - Fee Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Fee</CardTitle>
+            <CardDescription>Choose a pending fee to collect</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by student or fee type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Loading fees...
+                </div>
+              ) : filteredFees.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>{searchTerm ? 'No fees found matching your search' : 'No pending fees found'}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4"
+                    onClick={fetchFees}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </Button>
+                </div>
+              ) : (
+                filteredFees.map((fee: any) => {
+                  const remaining = parseFloat(fee.amount) - parseFloat(fee.paidAmount || 0);
+                  const isSelected = watchStudentFeeId === fee.id;
+                  
+                  return (
+                    <div
+                      key={fee.id}
+                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'hover:border-primary/50 hover:bg-muted/50'
+                      }`}
+                      onClick={() => setValue('studentFeeId', fee.id)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{fee.student?.name || 'Unknown Student'}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {fee.feeType?.name || 'Unknown Fee'} • {fee.academicYear}
+                            {fee.month && ` • ${fee.month}`}
+                          </p>
+                          {fee.student?.rollNumber && (
+                            <p className="text-xs text-muted-foreground">
+                              Roll: {fee.student.rollNumber}
+                            </p>
+                          )}
+                        </div>
+                        <Badge className={`${getStatusBadge(fee.status)} text-white ml-2 flex-shrink-0`}>
+                          {getStatusLabel(fee.status)}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between mt-2 text-sm flex-wrap gap-1">
+                        <span>Total: ₹{parseFloat(fee.amount).toFixed(2)}</span>
+                        <span className="text-green-600">
+                          Paid: ₹{parseFloat(fee.paidAmount || 0).toFixed(2)}
+                        </span>
+                        <span className={remaining > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                          Remaining: ₹{remaining.toFixed(2)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          Due: {new Date(fee.dueDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {parseFloat(fee.penaltyAmount || 0) > 0 && (
+                        <div className="mt-1 text-xs text-red-600">
+                          Penalty: ₹{parseFloat(fee.penaltyAmount).toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            
+            {filteredFees.length > 0 && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Showing {filteredFees.length} of {studentFees.length} pending fees
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right Column - Payment Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Details</CardTitle>
+            <CardDescription>Enter payment information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {selectedFee ? (
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                {/* Fee Summary */}
+                <div className="bg-muted p-4 rounded-lg space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Student:</span>
+                    <span className="font-medium">{selectedFee.student?.name || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fee Type:</span>
+                    <span className="font-medium">{selectedFee.feeType?.name || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Academic Year:</span>
+                    <span className="font-medium">{selectedFee.academicYear}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Amount:</span>
+                    <span className="font-medium">₹{parseFloat(selectedFee.amount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Paid:</span>
+                    <span className="font-medium text-green-600">₹{parseFloat(selectedFee.paidAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-1 mt-1">
+                    <span className="text-muted-foreground">Remaining:</span>
+                    <span className="font-medium text-red-600">
+                      ₹{(parseFloat(selectedFee.amount) - parseFloat(selectedFee.paidAmount || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                  {parseFloat(selectedFee.penaltyAmount || 0) > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span className="text-muted-foreground">Penalty:</span>
+                      <span className="font-medium">₹{parseFloat(selectedFee.penaltyAmount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Due Date:</span>
+                    <span className="font-medium">{new Date(selectedFee.dueDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <input type="hidden" {...register('studentFeeId')} />
+
+                {/* Amount */}
+                <div className="space-y-2">
+                  <Label htmlFor="amount">
+                    Amount <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    {...register('amount')}
+                    className={errors.amount ? 'border-red-500' : ''}
+                    placeholder="Enter payment amount"
+                  />
+                  {errors.amount && (
+                    <p className="text-sm text-red-500">{errors.amount.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Max: ₹{(parseFloat(selectedFee.amount) - parseFloat(selectedFee.paidAmount || 0)).toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Payment Mode */}
+                <div className="space-y-2">
+                  <Label htmlFor="paymentMode">
+                    Payment Mode <span className="text-red-500">*</span>
+                  </Label>
+                  <Select 
+                    onValueChange={(value) => setValue('paymentMode', value)}
+                    defaultValue="cash"
+                  >
+                    <SelectTrigger className={errors.paymentMode ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select payment mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="upi">UPI</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.paymentMode && (
+                    <p className="text-sm text-red-500">{errors.paymentMode.message}</p>
+                  )}
+                </div>
+
+                {/* Transaction ID */}
+                <div className="space-y-2">
+                  <Label htmlFor="transactionId">Transaction ID</Label>
+                  <Input
+                    id="transactionId"
+                    {...register('transactionId')}
+                    placeholder="Enter transaction ID (optional)"
+                  />
+                </div>
+
+                {/* Remarks */}
+                <div className="space-y-2">
+                  <Label htmlFor="remarks">Remarks</Label>
+                  <Textarea
+                    id="remarks"
+                    {...register('remarks')}
+                    placeholder="Add any remarks (optional)"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      reset({
+                        studentFeeId: '',
+                        amount: '',
+                        paymentMode: 'cash',
+                        transactionId: '',
+                        remarks: '',
+                      });
+                      setSelectedFee(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    disabled={isSubmitting}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    {isSubmitting ? 'Processing...' : 'Record Payment'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <CreditCard className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                <p className="text-lg font-medium">No Fee Selected</p>
+                <p className="text-sm">Select a pending fee from the left to start collecting</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

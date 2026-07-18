@@ -13,11 +13,13 @@ import settingsReducer from './slices/settingsSlice';
 import libraryReducer from './slices/librarySlice';
 import uiReducer from './slices/uiSlice';
 import subjectsReducer from './slices/subjectsSlice'
+import postReducer from './slices/postSlice'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     user:userReducer,
+    posts: postReducer,
     student: studentReducer,
     teacher: teacherReducer,
     class: classReducer,
@@ -29,7 +31,7 @@ export const store = configureStore({
     settings: settingsReducer,
     library: libraryReducer,
     ui: uiReducer,
-    subjects:subjectsReducer
+    subjects:subjectsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

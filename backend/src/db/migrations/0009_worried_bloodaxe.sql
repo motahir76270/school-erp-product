@@ -1,0 +1,1 @@
+ALTER TABLE `fee_types` ADD `user_id` varchar(50) NOT NULL;
