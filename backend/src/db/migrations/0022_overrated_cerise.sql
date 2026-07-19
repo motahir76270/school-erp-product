@@ -1,0 +1,1 @@
+ALTER TABLE `permission` ADD `subject` boolean DEFAULT false;

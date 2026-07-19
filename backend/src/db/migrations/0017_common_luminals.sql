@@ -1,0 +1,1 @@
+ALTER TABLE `fee_payments` ADD `pdf_url` varchar(150) NOT NULL;

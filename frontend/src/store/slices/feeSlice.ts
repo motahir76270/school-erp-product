@@ -474,6 +474,7 @@ export const getStudentFeeByIdApiCall = async (token: string, id: string): Promi
   }
 };
 
+
 // ========== PAYMENTS ==========
 
 interface PaymentData {
@@ -512,7 +513,7 @@ export const getPaymentByIdApiCall = async (token: string, id: string): Promise<
 
 export const getPaymentsByStudentFeeApiCall = async (token: string, studentFeeId: string): Promise<ApiResponse<FeePayment[]>> => {
   try {
-    const response = await axios.get<ApiResponse<FeePayment[]>>(`${API_BASE_URL}/student-fees/${studentFeeId}/payments`, {
+    const response = await axios.get(`${API_BASE_URL}/student-fees/recipts/${studentFeeId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;

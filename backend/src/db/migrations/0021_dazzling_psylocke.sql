@@ -1,0 +1,1 @@
+ALTER TABLE `schools` ADD `user_id` varchar(36) NOT NULL;

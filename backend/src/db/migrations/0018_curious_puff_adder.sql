@@ -1,0 +1,1 @@
+ALTER TABLE `fee_payments` MODIFY COLUMN `pdf_url` varchar(150);

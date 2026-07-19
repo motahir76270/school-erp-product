@@ -38,6 +38,7 @@ import {
   posts,
   accounts,
   accountHistory,
+  schools,
 } from "./users.js";
 
 // User relations
@@ -47,6 +48,15 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   like: one(postLikes),
   auditLogs: many(auditLogs),
   accounts: one(accounts),
+  schools: one(schools),
+  paymentGateway: one(paymentGateway),
+}));
+
+export const schoolRelation = relations(schools, ({ one }) => ({
+  user: one(users, {
+    fields: [schools.userId],
+    references: [users.id],
+  }),
 }));
 
 export const postRelation = relations(posts , ({one}) => ({
@@ -475,6 +485,8 @@ export const paymentGatewayRelations = relations(paymentGateway, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+
 
 
 export const accountsRelations = relations(accounts, ({ many }) => ({

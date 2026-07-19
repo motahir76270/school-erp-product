@@ -48,6 +48,7 @@ const menuItems = {
     { icon: Library, label: 'Library', href: '/dashboard/admin/library' },
     { icon: FileText, label: 'Notices', href: '/dashboard/admin/notices' },
     { icon: Bell, label: 'Events', href: '/dashboard/admin/events' },
+    { icon: Settings, label: 'GateWay', href: '/dashboard/admin/gateway' },
     { icon: Settings, label: 'Settings', href: '/dashboard/admin/settings' },
   ],
   admin: [
@@ -56,8 +57,6 @@ const menuItems = {
     { icon: GraduationCap, label: 'Teachers', href: '/dashboard/admin/teachers' },
     { icon: BookOpen, label: 'Classes', href: '/dashboard/admin/classes' },
     { icon: Clock, label: 'Attendance', href: '/dashboard/admin/attendance' },
-    { icon: Clock, label: 'Attendance', href: '/dashboard/admin/attendance/history' },
-    { icon: Clock, label: 'Attendance', href: '/dashboard/admin/attendance/' },
     { icon: DollarSign, label: 'Fees', href: '/dashboard/admin/fees' },
     { icon: Calendar, label: 'Timetable', href: '/dashboard/admin/timetable' },
     { icon: Award, label: 'Exams', href: '/dashboard/admin/exams' },

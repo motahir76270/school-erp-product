@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fee Receipt – Student Copy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+
+        body {
+            background: #e6e9ef;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        .receipt-wrapper {
+            max-width: 880px;
+            width: 100%;
+            background: white;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+            padding: 30px 35px 25px;
+        }
+
+        .top-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #1e3a6f;
+            padding-bottom: 14px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .college-details {
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        .college-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0b2a4a;
+            letter-spacing: 0.5px;
+        }
+
+        .college-address {
+            font-size: 14px;
+            color: #1f2a3e;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .college-email {
+            font-size: 13px;
+            color: #1f2a3e;
+        }
+
+        .logo-and-badge {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .school-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #1e3a6f;
+            background: #f0f4ff;
+            padding: 3px;
+        }
+
+        .receipt-badge {
+            background: #0b2a4a;
+            color: white;
+            padding: 10px 24px;
+            font-size: 22px;
+            font-weight: 700;
+            border-radius: 40px;
+            letter-spacing: 1px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 30px;
+            background: #f8faff;
+            border: 1px solid #dce1ec;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: baseline;
+            padding: 4px 0;
+            border-bottom: 1px dashed #dce1ec;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #1e3a6f;
+            width: 110px;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #0a1a2b;
+            font-weight: 500;
+            font-size: 15px;
+            word-break: break-word;
+        }
+
+        .fee-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 22px 0 18px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .fee-table thead th {
+            background: #1e3a6f;
+            color: white;
+            font-weight: 600;
+            padding: 12px 18px;
+            text-align: left;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+        }
+
+        .fee-table td {
+            padding: 12px 18px;
+            border-bottom: 1px solid #e2e7f0;
+            background: white;
+        }
+
+        .fee-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .fee-table .total-row td {
+            background: #f0f5fe;
+            font-weight: 700;
+            font-size: 17px;
+            border-top: 2px solid #1e3a6f;
+        }
+
+        .fee-table .total-row .amount-col {
+            color: #0d6b2b;
+            font-size: 20px;
+        }
+
+        .amount-col {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .desc-col {
+            font-weight: 500;
+        }
+
+        .amount-words {
+            margin: 6px 0 12px;
+            font-size: 16px;
+            background: #f3f7ff;
+            padding: 8px 18px;
+            border-radius: 30px;
+            display: inline-block;
+            border: 1px solid #cdd8ec;
+            font-weight: 500;
+            color: #0a2b4a;
+        }
+
+        .amount-words span {
+            font-weight: 700;
+            color: #1e3a6f;
+        }
+
+        .transaction-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 14px;
+            border-top: 1px solid #d0d9e8;
+            padding-top: 18px;
+        }
+
+        .trans-id {
+            background: #edf2fa;
+            padding: 6px 20px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e3a6f;
+        }
+
+        .trans-id strong {
+            font-weight: 700;
+        }
+
+        .status-badge {
+            color: white;
+            padding: 6px 28px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.paid {
+            background: #0d6b2b;
+        }
+
+        .status-badge.partial {
+            background: #e67e22;
+        }
+
+        .status-badge.pending {
+            background: #c0392b;
+        }
+
+        .receipt-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 40px;
+            padding-top: 10px;
+            border-top: 2px solid #1e3a6f;
+            flex-wrap: wrap;
+        }
+
+        .footer-left {
+            font-size: 13px;
+            color: #1f2a3e;
+            line-height: 1.7;
+            max-width: 65%;
+        }
+
+        .footer-left .note {
+            font-weight: 500;
+        }
+
+        .signature-area {
+            text-align: center;
+            min-width: 170px;
+            margin-top: 10px;
+        }
+
+        .signature-line {
+            width: 160px;
+            border-top: 2px solid #1e2f47;
+            margin: 40px auto 6px;
+            padding-top: 6px;
+            font-weight: 600;
+            color: #1e2f47;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+        }
+
+        .signature-area .received {
+            font-weight: 600;
+            color: #0b2a4a;
+            margin-bottom: 4px;
+        }
+
+        .copy-duo {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 30px;
+            border-top: 2px dashed #b3c2db;
+            padding-top: 30px;
+        }
+
+        .copy-box {
+            background: #fafcff;
+            border: 1px solid #d6dfed;
+            border-radius: 12px;
+            padding: 18px 18px 12px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+        }
+
+        .copy-box .copy-title {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1e3a6f;
+            border-bottom: 2px solid #1e3a6f;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+            letter-spacing: 0.3px;
+        }
+
+        .copy-box .info-grid-copy {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2px;
+            margin-bottom: 12px;
+        }
+
+        .copy-box .info-grid-copy .info-item {
+            border-bottom: 1px solid #e9eef6;
+            padding: 5px 0;
+        }
+
+        .copy-box .fee-table-copy {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .fee-table-copy td {
+            padding: 5px 6px;
+            border-bottom: 1px solid #e2e7f0;
+        }
+
+        .fee-table-copy .total-row td {
+            font-weight: 700;
+            border-top: 1px solid #1e3a6f;
+        }
+
+        .copy-box .amount-words-copy {
+            font-size: 14px;
+            background: #f0f5fe;
+            padding: 4px 16px;
+            border-radius: 30px;
+            display: inline-block;
+            margin: 6px 0 4px;
+            border: 1px solid #cdd8ec;
+            font-weight: 500;
+        }
+
+        .copy-box .signature-copy {
+            margin-top: 18px;
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid #bcc8dd;
+            padding-top: 10px;
+            font-weight: 600;
+            color: #1e2f47;
+        }
+
+        .copy-box .signature-copy span {
+            background: white;
+            padding: 0 12px;
+        }
+
+        @media (max-width: 700px) {
+            .receipt-wrapper {
+                padding: 18px;
+            }
+
+            .top-head {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .logo-and-badge {
+                justify-content: flex-start;
+                margin-top: 6px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .copy-duo {
+                grid-template-columns: 1fr;
+                gap: 25px;
+            }
+
+            .footer-left {
+                max-width: 100%;
+            }
+
+            .signature-area {
+                width: 100%;
+                margin-top: 20px;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 10px;
+            }
+
+            .receipt-wrapper {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="receipt-wrapper" id="receiptContainer">
+
+        <!-- ========== TOP HEADER ========== -->
+        <div class="top-head">
+            <div class="college-details">
+                <div class="college-name" id="schoolName">JAIPUR ENGINEERING COLLEGE</div>
+                <div class="college-address" id="schoolAddress">SP-43, RIICO Industrial Area, Kukas, Jaipur – 302038
+                </div>
+                <div class="college-email" id="schoolEmail">Email : jeckukas@yahoo.com | Website : www.jeckukas.org.in
+                </div>
+            </div>
+            <div class="logo-and-badge">
+                <img id="schoolLogo" class="school-logo" src="" alt="School Logo" style="display:none;">
+                <div class="receipt-badge">FEE RECEIPT</div>
+            </div>
+        </div>
+
+        <!-- ========== STUDENT INFO ========== -->
+        <div class="info-grid" id="studentInfoGrid">
+            <div class="info-item"><span class="info-label">Student's Name</span><span class="info-value"
+                    id="studentName">—</span></div>
+            <div class="info-item"><span class="info-label">S.R./Reg. No.</span><span class="info-value"
+                    id="regNo">—</span></div>
+            <div class="info-item"><span class="info-label">Father's Name</span><span class="info-value"
+                    id="fatherName">—</span></div>
+            <div class="info-item"><span class="info-label">Mother's Name</span><span class="info-value"
+                    id="motherName">—</span></div>
+            <div class="info-item"><span class="info-label">Session</span><span class="info-value" id="session">—</span>
+            </div>
+            <div class="info-item"><span class="info-label">Class</span><span class="info-value" id="classInfo">—</span>
+            </div>
+        </div>
+
+        <!-- ========== FEE TABLE ========== -->
+        <table class="fee-table" id="feeTable">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align:right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="desc-col">Total Fee</td>
+                    <td class="amount-col" id="totalFee">₹ 0.00</td>
+                </tr>
+                <tr>
+                    <td class="desc-col">Paid Amount</td>
+                    <td class="amount-col" id="paidAmount">₹ 0.00</td>
+                </tr>
+                <tr>
+                    <td class="desc-col">Due Amount</td>
+                    <td class="amount-col" id="dueAmount">₹ 0.00</td>
+                </tr>
+                <tr class="total-row">
+                    <td><strong>Balance Due</strong></td>
+                    <td class="amount-col" id="balanceDue">₹ 0.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- amount in words -->
+        <div class="amount-words" id="amountWords"><span>Amount Paid (in words) :</span> Zero</div>
+
+        <!-- transaction & status -->
+        <div class="transaction-row">
+            <div class="trans-id"><strong>Receipt No:</strong> <span id="receiptNumber">—</span></div>
+            <div class="trans-id"><strong>Transaction ID:</strong> <span id="transactionId">—</span></div>
+            <div class="status-badge" id="statusBadge">—</div>
+        </div>
+
+        <!-- ========== FOOTER WITH SIGNATURE ========== -->
+        <div class="receipt-footer">
+            <div class="footer-left">
+                <div class="note">*Admission is subject to Approval of Rajasthan Technical University, Kota</div>
+                <div class="note">*Fee once Paid are not Refundable irrespective of any Circumstances.</div>
+                <div class="note">*Subject to Jaipur jurisdiction only.</div>
+            </div>
+            <div class="signature-area">
+                <div class="received">Received with thanks</div>
+                <div class="signature-line">Signature</div>
+            </div>
+        </div>
+
+        <!-- ========== TWO COPIES : STUDENT & COLLEGE ========== -->
+        <div class="copy-duo">
+            <!-- Student Copy -->
+            <div class="copy-box" id="studentCopy">
+                <div class="copy-title">📄 Student's Copy</div>
+                <div class="info-grid-copy" id="studentCopyInfo">
+                    <div class="info-item"><span class="info-label">Student's Name</span><span class="info-value"
+                            id="copyStuName">—</span></div>
+                    <div class="info-item"><span class="info-label">S.R./Reg. No.</span><span class="info-value"
+                            id="copyRegNo">—</span></div>
+                    <div class="info-item"><span class="info-label">Father's Name</span><span class="info-value"
+                            id="copyFather">—</span></div>
+                    <div class="info-item"><span class="info-label">Mother's Name</span><span class="info-value"
+                            id="copyMother">—</span></div>
+                    <div class="info-item"><span class="info-label">Session</span><span class="info-value"
+                            id="copySession">—</span></div>
+                    <div class="info-item"><span class="info-label">Class</span><span class="info-value"
+                            id="copyClass">—</span></div>
+                </div>
+                <table class="fee-table-copy" id="studentCopyTable">
+                    <tbody>
+                        <tr>
+                            <td>Total Fee</td>
+                            <td style="text-align:right;" id="copyTotalFee">₹ 0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Paid Amount</td>
+                            <td style="text-align:right;" id="copyPaidAmount">₹ 0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Due Amount</td>
+                            <td style="text-align:right;" id="copyDueAmount">₹ 0.00</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td><strong>Balance Due</strong></td>
+                            <td style="text-align:right; font-weight:700;" id="copyBalanceDue">₹ 0.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="amount-words-copy" id="copyAmountWords"><span>Amount Paid :</span> Zero</div>
+                <div class="signature-copy"><span>Received with thanks / Signature</span></div>
+            </div>
+
+            <!-- College Copy -->
+            <div class="copy-box" id="collegeCopy">
+                <div class="copy-title">🏛️ College's Copy</div>
+                <div class="info-grid-copy" id="collegeCopyInfo">
+                    <div class="info-item"><span class="info-label">Student's Name</span><span class="info-value"
+                            id="collegeStuName">—</span></div>
+                    <div class="info-item"><span class="info-label">S.R./Reg. No.</span><span class="info-value"
+                            id="collegeRegNo">—</span></div>
+                    <div class="info-item"><span class="info-label">Father's Name</span><span class="info-value"
+                            id="collegeFather">—</span></div>
+                    <div class="info-item"><span class="info-label">Mother's Name</span><span class="info-value"
+                            id="collegeMother">—</span></div>
+                    <div class="info-item"><span class="info-label">Session</span><span class="info-value"
+                            id="collegeSession">—</span></div>
+                    <div class="info-item"><span class="info-label">Class</span><span class="info-value"
+                            id="collegeClass">—</span></div>
+                </div>
+                <table class="fee-table-copy" id="collegeCopyTable">
+                    <tbody>
+                        <tr>
+                            <td>Total Fee</td>
+                            <td style="text-align:right;" id="collegeTotalFee">₹ 0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Paid Amount</td>
+                            <td style="text-align:right;" id="collegePaidAmount">₹ 0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Due Amount</td>
+                            <td style="text-align:right;" id="collegeDueAmount">₹ 0.00</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td><strong>Balance Due</strong></td>
+                            <td style="text-align:right; font-weight:700;" id="collegeBalanceDue">₹ 0.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="amount-words-copy" id="collegeAmountWords"><span>Amount Paid :</span> Zero</div>
+                <div class="signature-copy"><span>Received with thanks / Signature</span></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        (function () {
+            // ----- ACTUAL DATA (as provided) -----
+            const data = {
+                receiptsData: {
+                    id: '437c8faf-71f2-4248-a692-5f6c7ff78e45',
+                    studentFeeId: '9fed7383-7335-4d74-adeb-3f585532ef50',
+                    amount: '400.00',
+                    paymentMode: 'cash',
+                    transactionId: null,
+                    receiptNumber: 'RCPT-45983985981',
+                    pdf_url: 'http://localhost:3030/receipts/student-fees/437c8faf-71f2-4248-a692-5f6c7ff78e45',
+                    paidBy: 'b09b88bd-6af2-419a-b928-0175f9ea96c0',
+                    remarks: null,
+                    createdAt: '2026-07-19T12:56:23.000Z',
+                    studentFee: {
+                        id: '9fed7383-7335-4d74-adeb-3f585532ef50',
+                        userId: 'b09b88bd-6af2-419a-b928-0175f9ea96c0',
+                        studentId: '16ed5413-6ec3-49ba-8a3e-97c58fea3dbd',
+                        feeTypeId: '78643309-b761-441e-bbb6-876998a75e85',
+                        amount: '45000',
+                        dueDate: '2026-07-19T00:00:00.000Z',
+                        dueAmount: '43800',
+                        paidAmount: '1200',
+                        penaltyAmount: '0',
+                        discount: '0',
+                        scholarship: '0',
+                        status: 'partial',
+                        academicYear: '2026',
+                        month: 'July',
+                        createdAt: '2026-07-19T10:06:14.000Z',
+                        updatedAt: '2026-07-19T07:39:47.000Z'
+                    }
+                },
+                feetype: {
+                    id: '78643309-b761-441e-bbb6-876998a75e85',
+                    userId: 'b09b88bd-6af2-419a-b928-0175f9ea96c0',
+                    name: 'Hostel Fee',
+                    code: 'HOSTEL132',
+                    amount: '45000.00',
+                    frequency: 'monthly',
+                    dueDay: 10,
+                    penaltyPerDay: '50.00',
+                    applicableClasses: [],
+                    description: 'Hostel Fees and Host Security',
+                    status: 'active',
+                    createdAt: '2026-07-18T22:01:17.000Z',
+                    updatedAt: '2026-07-18T17:17:15.000Z'
+                },
+                schoolData: {
+                    id: 'b09b88bd-6af2-419a-b928-0175f9ea96c0',
+                    userId: 'jhdfghjdsfjsjkf',
+                    email: 'sonu@gmail.com',
+                    password: '12345678',
+                    role: 'admin',
+                    firstName: 'Sonu',
+                    lastName: 'Khan',
+                    phone: '9784412674',
+                    address: 'civil line, jaipur, Rajasthan',
+                    profileImage: 'uploads/profile/profileImage-1784392144264-15862156.jpg',
+                    resetPasswordToken: null,
+                    isActive: true,
+                    createdAt: '2026-07-18T21:59:04.000Z',
+                    updatedAt: '2026-07-19T17:12:11.000Z',
+                    lastLoginAt: null,
+                    schools: {
+                        id: 'b09b88bd-6af2-419a-b928-0175f836c0',
+                        userId: 'b09b88bd-6af2-419a-b928-0175f9ea96c0',
+                        schoolName: 'Govt Sr Sec School',
+                        schoolCode: 'GOVT3932',
+                        affiliation: 'RBSE',
+                        affiliationNo: 'RBSE67254',
+                        directorName: 'Tahir Khan',
+                        principalName: 'Monu',
+                        website: null
+                    }
+                },
+                student: {
+                    id: '16ed5413-6ec3-49ba-8a3e-97c58fea3dbd',
+                    userId: 'jhdfghjdsfjsjkf',
+                    username: 'STU-230709',
+                    email: 'monu@gmail.com',
+                    name: 'monu',
+                    password: '123456',
+                    role: 'student',
+                    rollNumber: '2148914',
+                    admissionNumber: '2148942',
+                    classId: '1c933fcf-326e-444e-86b9-9f3870b1457a',
+                    sectionId: '0f626590-b0d3-41da-9338-24af7e0d706f',
+                    dateOfBirth: '2026-07-02T00:00:00.000Z',
+                    gender: null,
+                    profileImage: 'uploads/profile/profileImage-1784144179730-514359297.jpg',
+                    bloodGroup: null,
+                    religion: null,
+                    caste: null,
+                    nationality: null,
+                    aadharNumber: null,
+                    admissionDate: '2026-07-14T00:00:00.000Z',
+                    qrCode: '/uploads/qrcodes/16ed5413-6ec3-49ba-8a3e-97c58fea3dbd.png',
+                    status: 'active',
+                    createdAt: '2026-07-16T01:06:19.000Z',
+                    updatedAt: '2026-07-16T01:06:19.000Z'
+                },
+                class: { className: 'Class 2', sectionName: 'A' }
+            };
+
+            // ----- helper: safe string (show "N/A" if null/empty) -----
+            function safeStr(value) {
+                if (value === null || value === undefined || value === '') return 'N/A';
+                return String(value);
+            }
+
+            // ----- helper: format currency (Indian Rupee) -----
+            function formatCurrency(amount) {
+                if (!amount && amount !== 0) return '₹ 0.00';
+                const num = parseFloat(amount);
+                if (isNaN(num)) return '₹ 0.00';
+                return '₹ ' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+
+            // ----- helper: number to words (simple, max 6 digits) -----
+            function numberToWords(num) {
+                if (!num && num !== 0) return 'Zero';
+                const n = parseFloat(num);
+                if (isNaN(n)) return 'Zero';
+                const amountInt = Math.round(n);
+                if (amountInt === 0) return 'Zero';
+
+                const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+                const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+                function convertHundreds(value) {
+                    let word = '';
+                    const hundredsDigit = Math.floor(value / 100);
+                    const remainder = value % 100;
+                    if (hundredsDigit > 0) {
+                        word += ones[hundredsDigit] + ' Hundred ';
+                    }
+                    if (remainder > 0) {
+                        if (remainder < 20) {
+                            word += ones[remainder];
+                        } else {
+                            const tensDigit = Math.floor(remainder / 10);
+                            const onesDigit = remainder % 10;
+                            word += tens[tensDigit] + (onesDigit > 0 ? ' ' + ones[onesDigit] : '');
+                        }
+                    }
+                    return word.trim();
+                }
+
+                let words = '';
+                const lakhs = Math.floor(amountInt / 100000);
+                const thousands = Math.floor((amountInt % 100000) / 1000);
+                const hundreds = amountInt % 1000;
+
+                if (lakhs > 0) {
+                    words += convertHundreds(lakhs) + ' Lakh ';
+                }
+                if (thousands > 0) {
+                    words += convertHundreds(thousands) + ' Thousand ';
+                }
+                if (hundreds > 0) {
+                    words += convertHundreds(hundreds);
+                }
+                return words.trim() + ' Rupees';
+            }
+
+            // ----- extract values from data -----
+            // School info
+            const school = data.schoolData?.schools || {};
+            const schoolName = school.schoolName || 'JAIPUR ENGINEERING COLLEGE';
+            // Use schoolData.address for address
+            const schoolAddr = data.schoolData?.address || 'SP-43, RIICO Industrial Area, Kukas, Jaipur – 302038';
+            const schoolEmail = data.schoolData?.email || 'jeckukas@yahoo.com';
+            const schoolWebsite = school.website || 'www.jeckukas.org.in';
+            const schoolLogo = data.schoolData?.profileImage || '';
+
+            // Student info
+            const student = data.student || {};
+            const studentName = safeStr(student.name);
+            const regNo = safeStr(student.rollNumber);
+            // Father & Mother: set to "N/A" as per requirement
+            const fatherName = 'N/A';
+            const motherName = 'N/A';
+            const session = data.receiptsData?.studentFee?.academicYear || '2026';
+            const cls = data.class || {};
+            const classDisplay = `${safeStr(cls.className)} – ${safeStr(cls.sectionName)}`;
+
+            // Fee info - CORRECT ACCOUNTING
+            const totalFee = parseFloat(data.receiptsData?.studentFee?.amount) || 0;
+            const paidAmount = parseFloat(data.receiptsData?.amount) || 0;
+            const dueAmount = parseFloat(data.receiptsData?.studentFee?.dueAmount) || 0;
+            const balanceDue = totalFee - paidAmount;
+
+            const totalFeeFormatted = formatCurrency(totalFee);
+            const paidAmountFormatted = formatCurrency(paidAmount);
+            const dueAmountFormatted = formatCurrency(dueAmount);
+            const balanceDueFormatted = formatCurrency(balanceDue);
+
+            const receiptNumber = data.receiptsData?.receiptNumber || 'N/A';
+            const transactionId = data.receiptsData?.transactionId || 'N/A';
+            const status = data.receiptsData?.studentFee?.status || 'pending';
+            const statusDisplay = safeStr(status).toUpperCase();
+
+            const words = numberToWords(paidAmount) + ' Only';
+
+            // ----- update DOM elements -----
+            function setText(id, value) {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            }
+
+            // School header
+            setText('schoolName', schoolName);
+            setText('schoolAddress', schoolAddr);
+            setText('schoolEmail', `Email : ${schoolEmail}  |  Website : ${schoolWebsite}`);
+
+            // School logo - fix path
+            const logoImg = document.getElementById('schoolLogo');
+            if (schoolLogo && schoolLogo.trim() !== '') {
+                let imagePath = schoolLogo;
+                if (!imagePath.startsWith('/') && !imagePath.startsWith('http://') && !imagePath.startsWith('https://')) {
+                    imagePath = '/' + imagePath;
+                }
+                logoImg.src = imagePath;
+                logoImg.style.display = 'inline-block';
+                logoImg.onerror = function () {
+                    this.style.display = 'none';
+                    console.warn('Logo image not found at:', this.src);
+                };
+            } else {
+                logoImg.style.display = 'none';
+            }
+
+            // Student info
+            setText('studentName', studentName);
+            setText('regNo', regNo);
+            setText('fatherName', fatherName);
+            setText('motherName', motherName);
+            setText('session', session);
+            setText('classInfo', classDisplay);
+
+            // Fee table - CORRECT ACCOUNTING
+            setText('totalFee', totalFeeFormatted);
+            setText('paidAmount', paidAmountFormatted);
+            setText('dueAmount', dueAmountFormatted);
+            setText('balanceDue', balanceDueFormatted);
+
+            // Amount words
+            setText('amountWords', 'Amount Paid (in words) : ' + words);
+
+            // Receipt number, transaction & status
+            setText('receiptNumber', receiptNumber);
+            setText('transactionId', transactionId);
+            const statusBadge = document.getElementById('statusBadge');
+            if (statusBadge) {
+                statusBadge.textContent = statusDisplay;
+                // Add class for color coding
+                statusBadge.className = 'status-badge';
+                if (status === 'paid') {
+                    statusBadge.classList.add('paid');
+                } else if (status === 'partial') {
+                    statusBadge.classList.add('partial');
+                } else {
+                    statusBadge.classList.add('pending');
+                }
+            }
+
+            // ----- update both copies -----
+            // Student copy
+            setText('copyStuName', studentName);
+            setText('copyRegNo', regNo);
+            setText('copyFather', fatherName);
+            setText('copyMother', motherName);
+            setText('copySession', session);
+            setText('copyClass', classDisplay);
+            setText('copyTotalFee', totalFeeFormatted);
+            setText('copyPaidAmount', paidAmountFormatted);
+            setText('copyDueAmount', dueAmountFormatted);
+            setText('copyBalanceDue', balanceDueFormatted);
+            setText('copyAmountWords', 'Amount Paid : ' + words);
+
+            // College copy
+            setText('collegeStuName', studentName);
+            setText('collegeRegNo', regNo);
+            setText('collegeFather', fatherName);
+            setText('collegeMother', motherName);
+            setText('collegeSession', session);
+            setText('collegeClass', classDisplay);
+            setText('collegeTotalFee', totalFeeFormatted);
+            setText('collegePaidAmount', paidAmountFormatted);
+            setText('collegeDueAmount', dueAmountFormatted);
+            setText('collegeBalanceDue', balanceDueFormatted);
+            setText('collegeAmountWords', 'Amount Paid : ' + words);
+
+            console.log('✅ Receipt updated with correct accounting');
+            console.log('Total Fee:', totalFee);
+            console.log('Paid Amount:', paidAmount);
+            console.log('Due Amount:', dueAmount);
+            console.log('Balance Due:', balanceDue);
+            console.log('Status:', status);
+            console.log('Receipt No:', receiptNumber);
+        })();
+    </script>
+
+</body>
+
+</html>

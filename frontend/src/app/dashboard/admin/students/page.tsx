@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/layout/page-header';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, User, RefreshCw, Edit2, MoreVertical, Plus, ChevronLeft, ChevronRight, QrCode, Eye, Key } from 'lucide-react';
+import { Search, Trash2, User, RefreshCw, Edit2, MoreVertical, Plus, ChevronLeft, ChevronRight, QrCode, Eye, Key, School, Users, Filter } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -40,6 +40,7 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   getAllStudentsApiCall,
+  getStudentsByClassAndSectionApiCall,
   createStudentApiCall,
   hardDeleteStudentApiCall,
   updateStudentStatusApiCall,
@@ -107,10 +108,13 @@ export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
   
-  // Class and section states
+  // Class and section filter states
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [availableSections, setAvailableSections] = useState<Array<{id: string, name: string}>>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'class'>('all');
 
   // Create student form states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -176,51 +180,7 @@ export default function StudentsPage() {
   const [qrCodeStudentId, setQrCodeStudentId] = useState<string | null>(null);
   const [isRegeneratingQR, setIsRegeneratingQR] = useState(false);
 
-  const fetchStudents = async (page: number = currentPage) => {
-    const token = localStorage.getItem('accessToken');
-    
-    if (!token) {
-      toast.error('No authentication token found');
-      return;
-    }
-    
-    dispatch(setLoading(true));
-    try {
-      const data = await getAllStudentsApiCall(token, page, search, statusFilter);
-      console.log('API Response:', data);
-      
-      if (data?.success === true) {
-        let studentsData = [];
-        let paginationData = { page: 1, limit: 10, total: 0 };
-        
-        if (data?.data?.students && Array.isArray(data.data.students)) {
-          studentsData = data.data.students;
-          paginationData = {
-            page: data.data.pagination?.page || 1,
-            limit: data.data.pagination?.limit || 10,
-            total: data.data.pagination?.total || 0,
-          };
-        } else if (data?.data && Array.isArray(data.data)) {
-          studentsData = data.data;
-        } else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-          studentsData = [data.data];
-        }
-        
-        dispatch(setStudents(studentsData));
-        dispatch(setPagination(paginationData));
-      } else {
-        toast.error(data?.message || 'Failed to fetch students');
-        dispatch(setStudents([]));
-      }
-    } catch (error: any) {
-      console.error('Fetch students error:', error);
-      toast.error(error?.response?.data?.message || 'Failed to fetch students');
-      dispatch(setStudents([]));
-    } finally {
-      dispatch(setLoading(false));
-    }
-  };
-
+  // Fetch classes
   const fetchClasses = async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -243,7 +203,84 @@ export default function StudentsPage() {
     }
   };
 
-  // Handle class selection for both forms
+  // Handle class change for filter
+  const handleClassFilterChange = (classId: string) => {
+    setSelectedClassId(classId);
+    setSelectedSectionId('');
+    
+    const selectedClass = classes.find(c => c.id === classId);
+    setAvailableSections(selectedClass?.sections || []);
+    
+    if (classId) {
+      setFilterType('class');
+    } else {
+      setFilterType('all');
+    }
+  };
+
+  const fetchStudents = async (page: number = currentPage) => {
+    const token = localStorage.getItem('accessToken');
+    
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+    
+    dispatch(setLoading(true));
+    try {
+      let data;
+      
+      // Use class filter if selected
+      if (filterType === 'class' && selectedClassId) {
+        data = await getStudentsByClassAndSectionApiCall(
+          token,
+          selectedClassId,
+          selectedSectionId
+        );
+      } else {
+        data = await getAllStudentsApiCall(token, page, search, statusFilter);
+      }
+      
+      console.log('API Response:', data);
+      
+      if (data?.success === true) {
+        let studentsData = [];
+        let paginationData = { page: 1, limit: 10, total: 0 };
+        
+        if (data?.data?.students && Array.isArray(data.data.students)) {
+          studentsData = data.data.students;
+          paginationData = {
+            page: data.data.pagination?.page || 1,
+            limit: data.data.pagination?.limit || 10,
+            total: data.data.pagination?.total || 0,
+          };
+        } else if (data?.data && Array.isArray(data.data)) {
+          studentsData = data.data;
+          paginationData = {
+            page: data.pagination?.page || 1,
+            limit: data.pagination?.limit || 10,
+            total: data.pagination?.total || 0,
+          };
+        } else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+          studentsData = [data.data];
+        }
+        
+        dispatch(setStudents(studentsData));
+        dispatch(setPagination(paginationData));
+      } else {
+        toast.error(data?.message || 'Failed to fetch students');
+        dispatch(setStudents([]));
+      }
+    } catch (error: any) {
+      console.error('Fetch students error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to fetch students');
+      dispatch(setStudents([]));
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
+
+  // Handle class selection for create/edit forms
   const handleClassChange = (classId: string, formType: 'create' | 'edit') => {
     const selectedClass = classes.find(c => c.id === classId);
     const sections = selectedClass?.sections || [];
@@ -259,9 +296,12 @@ export default function StudentsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    fetchStudents(currentPage);
     fetchClasses();
-  }, [search, currentPage, statusFilter]);
+  }, []);
+
+  useEffect(() => {
+    fetchStudents(currentPage);
+  }, [search, currentPage, statusFilter, selectedClassId, selectedSectionId, filterType]);
 
   const filteredStudents = useMemo(() => {
     if (!students || !Array.isArray(students)) return [];
@@ -674,6 +714,22 @@ export default function StudentsPage() {
     }
   };
 
+  // Get class name by ID
+  const getClassName = (classId: string) => {
+    const cls = classes.find(c => c.id === classId);
+    return cls?.name || classId;
+  };
+
+  // Get section name by ID
+  const getSectionName = (sectionId: string | null) => {
+    if (!sectionId) return 'N/A';
+    for (const cls of classes) {
+      const section = cls.sections.find(s => s.id === sectionId);
+      if (section) return section.name;
+    }
+    return sectionId;
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="Students" description="Manage student accounts and profiles." />
@@ -696,41 +752,113 @@ export default function StudentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search students by name, email, or roll number"
-                className="pl-9"
-              />
+          {/* Filters - Class and Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="space-y-2">
+              <Label htmlFor="classFilter">Class</Label>
+              <Select
+                value={selectedClassId}
+                onValueChange={handleClassFilterChange}
+              >
+                <SelectTrigger disabled={isLoadingClasses}>
+                  <SelectValue placeholder={isLoadingClasses ? "Loading classes..." : "All Classes"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Classes</SelectItem>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      <div className="flex items-center gap-2">
+                        <School className="h-4 w-4" />
+                        {cls.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={statusFilter} onValueChange={(value) => {
-              setStatusFilter(value);
-              setCurrentPage(1);
-            }}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+
+            <div className="space-y-2">
+              <Label htmlFor="sectionFilter">Section</Label>
+              <Select
+                value={selectedSectionId}
+                onValueChange={setSelectedSectionId}
+                disabled={!selectedClassId || availableSections.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    !selectedClassId ? "Select class first" : 
+                    availableSections.length === 0 ? "No sections available" : 
+                    "All Sections"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Sections</SelectItem>
+                  {availableSections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        {section.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="statusFilter">Status</Label>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value);
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search students by name, email, or roll number"
+              className="pl-9"
+            />
           </div>
           
+          {/* Students count */}
+          <div className="flex items-center justify-between mb-4">
+            <Badge variant="secondary" className="text-sm">
+              {filteredStudents.length} Students
+            </Badge>
+            {selectedClassId && (
+              <div className="text-sm text-muted-foreground">
+                <Filter className="inline h-4 w-4 mr-1" />
+                Filtering by: {getClassName(selectedClassId)} {selectedSectionId && `- ${getSectionName(selectedSectionId)}`}
+              </div>
+            )}
+          </div>
+
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
                   <TableHead>Roll Number</TableHead>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Section</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -739,13 +867,13 @@ export default function StudentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading students...
                     </TableCell>
                   </TableRow>
                 ) : !filteredStudents || filteredStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No students found
                     </TableCell>
                   </TableRow>
@@ -776,6 +904,8 @@ export default function StudentsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{student.rollNumber}</TableCell>
+                      <TableCell>{getClassName(student.classId)}</TableCell>
+                      <TableCell>{getSectionName(student.sectionId)}</TableCell>
                       <TableCell>{student.email}</TableCell>
                       <TableCell>
                         <Badge 
@@ -847,8 +977,8 @@ export default function StudentsPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
-          {!loading && students && students.length > 0 && (
+          {/* Pagination - Only show for 'all' filter type */}
+          {filterType === 'all' && !loading && students && students.length > 0 && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-muted-foreground">
                 Page {currentPage} • Showing {students.length} students • Total: {pagination.total}
@@ -878,6 +1008,7 @@ export default function StudentsPage() {
         </CardContent>
       </Card>
 
+      {/* Rest of the modals remain the same */}
       {/* Create Student Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -950,7 +1081,7 @@ export default function StudentsPage() {
               </div>
             </div>
             
-            {/* Class and Section Dropdowns - Updated */}
+            {/* Class and Section Dropdowns */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="classId">Class <span className="text-destructive">*</span></Label>
@@ -1169,7 +1300,7 @@ export default function StudentsPage() {
               </div>
             </div>
             
-            {/* Edit Class and Section Dropdowns - Updated */}
+            {/* Edit Class and Section Dropdowns */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="edit-classId">Class <span className="text-destructive">*</span></Label>
@@ -1327,7 +1458,7 @@ export default function StudentsPage() {
               {currentAvatar && !editAvatarFile && (
                 <div className="flex items-center gap-2">
                   <Image
-                    src={`${baseURl}${currentAvatar}`}
+                    src={`${baseURl}/${currentAvatar}`}
                     alt="Current profile"
                     width={40}
                     height={40}
@@ -1427,17 +1558,11 @@ export default function StudentsPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Class</p>
-                  <p className="font-medium">
-                    {classes.find(c => c.id === viewingStudent.classId)?.name || viewingStudent.classId}
-                  </p>
+                  <p className="font-medium">{getClassName(viewingStudent.classId)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Section</p>
-                  <p className="font-medium">
-                    {viewingStudent.sectionId 
-                      ? classes.find(c => c.id === viewingStudent.classId)?.sections.find(s => s.id === viewingStudent.sectionId)?.name || viewingStudent.sectionId
-                      : 'N/A'}
-                  </p>
+                  <p className="font-medium">{getSectionName(viewingStudent.sectionId)}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-sm text-muted-foreground">Address</p>

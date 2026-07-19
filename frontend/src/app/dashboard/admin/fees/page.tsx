@@ -145,8 +145,8 @@ export default function FeeDashboard() {
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Fees"
-          value={studentFeesCount.totalFees}
+          title="Total Fees Amount"
+          value={studentFeesCount.totalAmount}
           icon={DollarSign}
           color="bg-blue-500"
           description={`${feeTypes.length} fee types`}
@@ -189,17 +189,17 @@ export default function FeeDashboard() {
             <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('fees/collect/studentFee')}>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Assign Fee</p>
+              <p className="text-sm font-medium text-muted-foreground">Collect Fee And Recipts</p>
               <p className="text-sm mt-1">Students fee</p>
             </div>
             <Plus className="h-5 w-5 text-muted-foreground" />
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('fees/collect')}>
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('fees/receipts')}>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Collect Fee</p>
+              <p className="text-sm font-medium text-muted-foreground">Manage Receipts</p>
               <p className="text-sm mt-1">Record payment</p>
             </div>
             <CreditCard className="h-5 w-5 text-muted-foreground" />

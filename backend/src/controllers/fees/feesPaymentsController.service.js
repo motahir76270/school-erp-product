@@ -114,8 +114,8 @@ export const makePayment = async (req, res) => {
 
     const paymentId = uuidv4();
     const receiptNumber = generateReceiptNumber();
-
-
+    
+    const pdfUrl = `http://localhost:3030/api/receipts/student-fees/preview/${paymentId}`;
     // Insert payment transaction
     await db.insert(feePayments).values({
       id: paymentId,
@@ -126,6 +126,7 @@ export const makePayment = async (req, res) => {
       receiptNumber,
       paidBy: userId,
       remarks: remarks || null,
+      pdf_url: pdfUrl,
     });
 
 
@@ -187,15 +188,10 @@ export const makePayment = async (req, res) => {
     );
   }
 };
-// ==================== GET PAYMENT BY ID ====================
+// ==================== GET PAYMENT BY Fee ID ====================
 export const getPaymentById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return errorResponse(res, "User not authenticated", 401);
-    }
 
     if (!id) {
       return errorResponse(res, "Payment ID is required", 400);
@@ -204,7 +200,7 @@ export const getPaymentById = async (req, res) => {
     const [payment] = await db
       .select()
       .from(feePayments)
-      .where(and(eq(feePayments.id, id), eq(feePayments.userId, userId)))
+      .where(eq(feePayments.id, id))
       .limit(1);
 
     if (!payment) {
@@ -240,7 +236,7 @@ export const getPaymentById = async (req, res) => {
 };
 
 // ==================== GET PAYMENTS BY STUDENT FEE ====================
-export const getPaymentsByStudentFee = async (req, res) => {
+export const getPaymentsReceptsByStudentFee = async (req, res) => {
   try {
     const { studentFeeId } = req.params;
     const userId = req.user?.id;
@@ -253,13 +249,23 @@ export const getPaymentsByStudentFee = async (req, res) => {
       return errorResponse(res, "Student fee ID is required", 400);
     }
 
-    const payments = await db
-      .select()
-      .from(feePayments)
-      .where(and(eq(feePayments.studentFeeId, studentFeeId), eq(feePayments.userId, userId)))
-      .orderBy(feePayments.createdAt, "desc");
+    const receiptsData = await db.query.feePayments.findMany({
+      where: and(
+        eq(feePayments.studentFeeId, studentFeeId),
+        eq(feePayments.userId, userId),
+      ),
+      with: {
+        studentFee: true,
+      },
+      orderBy: (feePayments, { desc }) => [desc(feePayments.createdAt)],
+    });
 
-    return successResponse(res, payments, "Payments fetched successfully", 200);
+    return successResponse(
+      res,
+      receiptsData,
+      "Payments fetched successfully",
+      200,
+    );
   } catch (error) {
     console.error("Get payments error:", error);
     return errorResponse(res, error.message || "Failed to get payments", 500);

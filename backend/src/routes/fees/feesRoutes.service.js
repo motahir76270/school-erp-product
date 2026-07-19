@@ -19,7 +19,7 @@ import {
 import {
   makePayment,
   getPaymentById,
-  getPaymentsByStudentFee,
+  getPaymentsReceptsByStudentFee,
   getAllPayments,
 } from "../../controllers/fees/feesPaymentsController.service.js";
 import {
@@ -53,7 +53,11 @@ feesRouter.get("/student-fees/fees/:studentId", authMiddleware, getStudentFees);
 feesRouter.post("/payments", authMiddleware, makePayment);
 feesRouter.get("/payments", authMiddleware, getAllPayments);
 feesRouter.get("/payments/:id", authMiddleware, getPaymentById);
-feesRouter.get("/student-fees/:studentFeeId/payments", authMiddleware, getPaymentsByStudentFee);
+feesRouter.get(
+  "/student-fees/recipts/:id",
+  authMiddleware,
+  getPaymentsReceptsByStudentFee,
+);
 
 // ==================== PENALTY ROUTES ====================
 feesRouter.post("/penalties/bulk", authMiddleware, bulkCalculatePenalties);

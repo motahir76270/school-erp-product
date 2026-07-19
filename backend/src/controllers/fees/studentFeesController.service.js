@@ -344,78 +344,110 @@ export const getStudentFeeById = async (req, res) => {
     }
 
     if (!studentId) {
-      return errorResponse(res, "Student fee ID is required", 400);
+      return errorResponse(res, "Student ID is required", 400);
     }
 
     const fees = await db.query.studentFees.findMany({
-      where: (studentFees, { eq }) => eq(studentFees.studentId, studentId),
+      where: (studentFees, { eq }) =>
+        eq(studentFees.studentId, studentId),
       with: {
         feeType: true,
         penalties: true,
       },
     });
 
+    if (fees.length === 0) {
+      return errorResponse(res, "Student fee not found", 404);
+    }
+
     const today = new Date();
 
-    for (const fee in fees) {
+    let totalFee = 0;
+    let totalPaid = 0;
+    let totalOverdue = 0;
+
+    for (const fee of fees) {
+      // Calculate summary for all fees
+      totalFee += Number(fee.amount || 0);
+      totalPaid += Number(fee.paidAmount || 0);
+      let penalty = Number(fee.penaltyAmount || 0);
+
       if (
         fee.status !== "paid" &&
         today > new Date(fee.dueDate) &&
-        fee.feeType.status === "active"
+        fee.feeType?.status === "active"
       ) {
         const daysLate = Math.floor(
           (today.getTime() - new Date(fee.dueDate).getTime()) /
-            (1000 * 60 * 60 * 24),
+            (1000 * 60 * 60 * 24)
         );
 
-        const penalty = daysLate * Number(fee.feeType.penaltyPerDay);
+        penalty =
+          daysLate * Number(fee.feeType.penaltyPerDay || 0);
 
-            
+        // Update fee penalty
         await db
           .update(studentFees)
           .set({
             penaltyAmount: penalty.toString(),
             updatedAt: new Date(),
           })
-          .where(eq(studentFees.feeTypeId, fee.id));
+          .where(eq(studentFees.id, fee.id));
 
         // Check existing penalty
-        const existingPenalty = await db.query.feePenalties.findFirst({
-          where: (feePenalties, { eq }) =>
-            eq(feePenalties.studentFeeId, fee.id),
-        });
+        const existingPenalty =
+          await db.query.feePenalties.findFirst({
+            where: (feePenalties, { eq }) =>
+              eq(feePenalties.studentFeeId, fee.id),
+          });
 
         if (existingPenalty) {
-          // Update existing penalty
           await db
             .update(feePenalties)
             .set({
               amount: penalty.toString(),
-              daysLate: daysLate,
+              daysLate,
               penaltyPerDay: fee.feeType.penaltyPerDay,
             })
             .where(eq(feePenalties.id, existingPenalty.id));
         } else {
-          // Create new penalty
           await db.insert(feePenalties).values({
             id: uuidv4(),
             studentFeeId: fee.id,
             amount: penalty.toString(),
-            daysLate: daysLate,
+            daysLate,
             penaltyPerDay: fee.feeType.penaltyPerDay,
           });
         }
-
       }
-    }
 
-    if (!fees) {
-      return errorResponse(res, "Student fee not found", 404);
+      totalOverdue += penalty;
     }
+    
+    let totalPending = Number(totalFee - totalPaid);
+    const feeSummary = {
+      totalFees: totalFee,
+      paid: totalPaid,
+      pending: totalPending,
+      overDue: totalOverdue,
+    };
 
-    return successResponse(res, fees, "Student fee fetched successfully", 200);
+    return successResponse(
+      res,
+      {
+        fees,
+        feeSummary,
+      },
+      "Student fee fetched successfully",
+      200
+    );
   } catch (error) {
     console.error("Get student fee error:", error);
-    return errorResponse(res, error.message || "Failed to get student fee", 500);
+
+    return errorResponse(
+      res,
+      error.message || "Failed to get student fee",
+      500
+    );
   }
 };

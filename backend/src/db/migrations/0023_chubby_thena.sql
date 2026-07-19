@@ -1,0 +1,1 @@
+ALTER TABLE `payment_gateway` ADD `service` boolean DEFAULT true;

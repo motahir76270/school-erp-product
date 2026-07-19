@@ -1,0 +1,1 @@
+ALTER TABLE `attendance_logs` ADD `created_at` timestamp DEFAULT (now());

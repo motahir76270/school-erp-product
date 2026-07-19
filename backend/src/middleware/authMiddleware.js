@@ -6,7 +6,7 @@ export const authMiddleware = (req, res, next) => {
     let token = null;
 
     // Check Authorization header
-    const authHeader = req.headers.authorization || req.cookies?.token;
+    const authHeader = req.headers.authorization
 
     if (authHeader) {
       const parts = authHeader.split(" ");
@@ -22,7 +22,7 @@ export const authMiddleware = (req, res, next) => {
     }
 
     if (!token) {
-      return errorResponse(res, "No token provided", 401);
+      return errorResponse(res, `No token provided ${req?.cookies?.token}`, 401);
     }
 
     const decoded = verifyToken(token);

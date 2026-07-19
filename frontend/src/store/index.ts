@@ -14,6 +14,8 @@ import libraryReducer from './slices/librarySlice';
 import uiReducer from './slices/uiSlice';
 import subjectsReducer from './slices/subjectsSlice'
 import postReducer from './slices/postSlice'
+import receiptReducer from './slices/reciptSlice'
+import gatewayReducer from './slices/gatewaySlice'
 
 export const store = configureStore({
   reducer: {
@@ -25,6 +27,7 @@ export const store = configureStore({
     class: classReducer,
     attendance: attendanceReducer,
     fee: feeReducer,
+    receipt: receiptReducer,
     notice: noticeReducer,
     exam: examReducer,
     mcq: mcqReducer,
@@ -32,6 +35,7 @@ export const store = configureStore({
     library: libraryReducer,
     ui: uiReducer,
     subjects:subjectsReducer,
+    gateway:gatewayReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -95,6 +95,13 @@ interface StudentFee {
   feeType?: FeeType;
 }
 
+interface FeeSummary {
+  totalFees: number;
+  paid: number;
+  pending: number;
+  overDue: number;
+}
+
 // ==================== Component ====================
 export default function StudentFeeDetailsPage() {
   const router = useRouter();
@@ -118,12 +125,11 @@ export default function StudentFeeDetailsPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [summary, setSummary] = useState({
+  const [feeSummary, setFeeSummary] = useState<FeeSummary>({
     totalFees: 0,
-    totalPaid: 0,
-    totalPending: 0,
-    totalOverdue: 0,
-    totalPenalty: 0,
+    paid: 0,
+    pending: 0,
+    overDue: 0,
   });
 
   // ==================== Fetch Fees ====================
@@ -145,43 +151,41 @@ export default function StudentFeeDetailsPage() {
     try {
       console.log('Fetching fees for student ID:', studentId);
       
-      // Make sure we're passing the studentId correctly
-      const feesData = await getStudentFeesApiCall(token, studentId);
-      console.log('Fees API Response:', feesData);
+      const response = await getStudentFeesApiCall(token, studentId);
+      console.log('Fees API Response:', response);
       
       // Check if the response indicates success
-      if (feesData?.success === true) {
-        // Extract fees array from response
-        let feesArray:any = [];
+      if (response?.success === true && response?.data) {
+        const data:any = response.data;
         
-
+        // Extract fees array from response.data.fees
+        let feesArray: any[] = [];
+        if (data.fees && Array.isArray(data.fees)) {
+          feesArray = data.fees;
+        } else if (Array.isArray(data)) {
+          feesArray = data;
+        }
         
         console.log('Extracted fees array:', feesArray);
         
-        // Update Redux store
+        // Update Redux store with the fees array
         dispatch(setStudentFees({ 
-          fees: feesData, 
-          pagination: feesData.data?.pagination || { page: 1, limit: 10, total: feesArray.length } 
+          fees: feesArray, 
+          pagination: { page: 1, limit: 10, total: feesArray.length } 
         }));
         
-        // Calculate summary
-        const totalFees = feesArray.reduce((sum: number, f: any) => sum + parseFloat(f.amount || 0), 0);
-        const totalPaid = feesArray.reduce((sum: number, f: any) => sum + parseFloat(f.paidAmount || 0), 0);
-        const totalPending = feesArray
-          .filter((f: any) => f.status === 'pending' || f.status === 'partial')
-          .reduce((sum: number, f: any) => sum + (parseFloat(f.amount || 0) - parseFloat(f.paidAmount || 0)), 0);
-        const totalOverdue = feesArray
-          .filter((f: any) => f.status === 'overdue')
-          .reduce((sum: number, f: any) => sum + parseFloat(f.amount || 0), 0);
-        const totalPenalty = feesArray.reduce((sum: number, f: any) => sum + parseFloat(f.penaltyAmount || 0), 0);
-        
-        setSummary({
-          totalFees,
-          totalPaid,
-          totalPending,
-          totalOverdue,
-          totalPenalty,
-        });
+        // Extract fee summary from response
+        if (data.feeSummary) {
+          setFeeSummary({
+            totalFees: data.feeSummary.totalFees || 0,
+            paid: data.feeSummary.paid || 0,
+            pending: data.feeSummary.pending || 0,
+            overDue: data.feeSummary.overDue || 0,
+          });
+        } else {
+          // Calculate summary from fees array if feeSummary not provided
+          calculateSummary(feesArray);
+        }
         
         if (feesArray.length > 0) {
           toast.success(`Loaded ${feesArray.length} fee records`);
@@ -190,7 +194,7 @@ export default function StudentFeeDetailsPage() {
         }
       } else {
         // Handle error response
-        const errorMessage = feesData?.message || 'Failed to fetch fees';
+        const errorMessage = response?.message || 'Failed to fetch fees';
         console.error('API Error:', errorMessage);
         toast.error(errorMessage);
         
@@ -199,12 +203,11 @@ export default function StudentFeeDetailsPage() {
         dispatch(setFeeError(errorMessage));
         
         // Reset summary
-        setSummary({
+        setFeeSummary({
           totalFees: 0,
-          totalPaid: 0,
-          totalPending: 0,
-          totalOverdue: 0,
-          totalPenalty: 0,
+          paid: 0,
+          pending: 0,
+          overDue: 0,
         });
       }
     } catch (error: any) {
@@ -215,17 +218,35 @@ export default function StudentFeeDetailsPage() {
       dispatch(setStudentFees({ fees: [], pagination: { page: 1, limit: 10, total: 0 } }));
       
       // Reset summary
-      setSummary({
+      setFeeSummary({
         totalFees: 0,
-        totalPaid: 0,
-        totalPending: 0,
-        totalOverdue: 0,
-        totalPenalty: 0,
+        paid: 0,
+        pending: 0,
+        overDue: 0,
       });
     } finally {
       dispatch(setFeeLoading(false));
       setIsRefreshing(false);
     }
+  };
+
+  // ==================== Calculate Summary from Fees Array ====================
+  const calculateSummary = (feesArray: any[]) => {
+    const totalFees = feesArray.reduce((sum: number, f: any) => sum + parseFloat(f.amount || 0), 0);
+    const paid = feesArray.reduce((sum: number, f: any) => sum + parseFloat(f.paidAmount || 0), 0);
+    const pending = feesArray
+      .filter((f: any) => f.status === 'pending' || f.status === 'partial')
+      .reduce((sum: number, f: any) => sum + (parseFloat(f.amount || 0) - parseFloat(f.paidAmount || 0)), 0);
+    const overDue = feesArray
+      .filter((f: any) => f.status === 'overdue')
+      .reduce((sum: number, f: any) => sum + (parseFloat(f.amount || 0) - parseFloat(f.paidAmount || 0)), 0);
+    
+    setFeeSummary({
+      totalFees,
+      paid,
+      pending,
+      overDue,
+    });
   };
 
   // ==================== Load Fees on Mount ====================
@@ -333,6 +354,35 @@ export default function StudentFeeDetailsPage() {
     return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
   };
 
+  // ==================== Get Fees Array from Store ====================
+  const getFeesArray = () => {
+    if (!studentFees) return [];
+    
+    // If studentFees is already an array
+    if (Array.isArray(studentFees)) {
+      return studentFees;
+    }
+    
+    // If studentFees has a fees property that's an array
+    if (studentFees.fees && Array.isArray(studentFees.fees)) {
+      return studentFees.fees;
+    }
+    
+    // If studentFees has a data property with fees
+    if (studentFees.data?.fees && Array.isArray(studentFees.data.fees)) {
+      return studentFees.data.fees;
+    }
+    
+    // If studentFees.data is an array
+    if (studentFees.data && Array.isArray(studentFees.data)) {
+      return studentFees.data;
+    }
+    
+    return [];
+  };
+
+  const feesList = getFeesArray();
+
   // ==================== Loading State ====================
   if (studentLoading) {
     return (
@@ -343,24 +393,6 @@ export default function StudentFeeDetailsPage() {
   }
 
   // ==================== Render ====================
-  // Get the fees array from the response
-  const getFeesArray = () => {
-    if (!studentFees) return [];
-    
-    if (Array.isArray(studentFees)) {
-      return studentFees;
-    }
-    if (studentFees.data?.fees && Array.isArray(studentFees.data.fees)) {
-      return studentFees.data.fees;
-    }
-    if (studentFees.data && Array.isArray(studentFees.data)) {
-      return studentFees.data;
-    }
-    return [];
-  };
-
-  const feesList = getFeesArray();
-
   return (
     <div className="space-y-6">
       {/* Page Header with Refetch Button */}
@@ -426,14 +458,14 @@ export default function StudentFeeDetailsPage() {
         </Card>
       )}
 
-      {/* Fee Summary Cards */}
+      {/* Fee Summary Cards - Using feeSummary from API */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Fees</p>
-                <p className="text-2xl font-bold">₹{summary.totalFees.toFixed(2)}</p>
+                <p className="text-2xl font-bold">₹{feeSummary.totalFees.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-full">
                 <FileText className="h-6 w-6 text-blue-600" />
@@ -446,7 +478,7 @@ export default function StudentFeeDetailsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Paid</p>
-                <p className="text-2xl font-bold text-green-600">₹{summary.totalPaid.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-600">₹{feeSummary.paid.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
                 <CreditCard className="h-6 w-6 text-green-600" />
@@ -459,7 +491,7 @@ export default function StudentFeeDetailsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">₹{summary.totalPending.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-yellow-600">₹{feeSummary.pending.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-yellow-100 rounded-full">
                 <Clock className="h-6 w-6 text-yellow-600" />
@@ -472,7 +504,7 @@ export default function StudentFeeDetailsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">₹{summary.totalOverdue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-red-600">₹{feeSummary.overDue.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-red-100 rounded-full">
                 <AlertCircle className="h-6 w-6 text-red-600" />
@@ -509,7 +541,7 @@ export default function StudentFeeDetailsPage() {
                   <TableHead>Fee Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Paid</TableHead>
-                  <TableHead>Remaining</TableHead>
+                  <TableHead>Due Amount</TableHead>
                   <TableHead>Penalty</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -535,13 +567,17 @@ export default function StudentFeeDetailsPage() {
                   feesList.map((fee: any) => {
                     const remaining = parseFloat(fee.amount) - parseFloat(fee.paidAmount || 0);
                     const isOverdue = new Date(fee.dueDate) < new Date() && fee.status !== 'paid';
-                    const status = isOverdue && fee.status !== 'paid' ? 'overdue' : fee.status;
+                    // Use status from API if available, otherwise determine from due date
+                    const status = fee.status || (isOverdue ? 'overdue' : 'pending');
+                    
+                    // Get fee type name from feeType object or use a fallback
+                    const feeTypeName = fee.feeType?.name || fee.feeTypeName || 'Unknown';
                     
                     return (
                       <TableRow key={fee.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{fee.feeType?.name || 'Unknown'}</p>
+                            <p className="font-medium">{feeTypeName}</p>
                             <p className="text-xs text-muted-foreground">
                               {fee.academicYear} {fee.month ? `- ${fee.month}` : ''}
                             </p>
@@ -575,7 +611,7 @@ export default function StudentFeeDetailsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            {status !== 'paid' && (
+                            {status !== 'paid' && remaining > 0 && (
                               <Button
                                 size="sm"
                                 onClick={() => handlePaymentClick(fee)}
@@ -594,6 +630,12 @@ export default function StudentFeeDetailsPage() {
                                 <Printer className="mr-2 h-4 w-4" />
                                 Receipt
                               </Button>
+                            )}
+                            {status !== 'paid' && remaining <= 0 && (
+                              <Badge className="bg-green-500">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Fully Paid
+                              </Badge>
                             )}
                           </div>
                         </TableCell>

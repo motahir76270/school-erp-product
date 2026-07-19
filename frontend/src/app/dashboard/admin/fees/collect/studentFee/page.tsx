@@ -169,8 +169,8 @@ export default function StudentFeeCollectionPage() {
   };
 
   // Handle student click to view fee details
-  const handleStudentClick = (student: Student) => {
-    router.push(`studentFee/${student.id}`);
+  const handleStudentFeeReciptsClick = (student: Student) => {
+    router.push(`studentFee/receipts/${student.id}`);
   };
 
   // Handle collect fee button
@@ -358,7 +358,7 @@ export default function StudentFeeCollectionPage() {
                     <TableRow 
                       key={student.id} 
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => handleStudentClick(student)}
+                      onClick={() => handleStudentFeeReciptsClick(student)}
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -397,10 +397,10 @@ export default function StudentFeeCollectionPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleStudentClick(student)}
+                            onClick={() => handleStudentFeeReciptsClick(student)}
                           >
                             <Eye className="mr-2 h-4 w-4" />
-                            View
+                            View Receipts
                           </Button>
                           <Button
                             size="sm"

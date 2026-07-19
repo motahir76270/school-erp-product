@@ -21,7 +21,7 @@ export const users = mysqlTable("users", {
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   phone: varchar("phone", { length: 20 }),
-  address: text("address"),
+  address: text("address" , {length:200}),
   profileImage: varchar("profile_image", { length: 500 }),
   resetPasswordToken:varchar('resetPasswordToken' , {length:600}),
   isActive: boolean("is_active").default(true),
@@ -189,6 +189,7 @@ export const feePayments = mysqlTable("fee_payments", {
   paymentMode: varchar("payment_mode", { length: 20 }).notNull(), // cash, card, upi, bank_transfer
   transactionId: varchar("transaction_id", { length: 100 }),
   receiptNumber: varchar("receipt_number", { length: 50 }).notNull(),
+  pdf_url: varchar("pdf_url", { length: 150 }),
   paidBy: varchar("paid_by", { length: 36 }).notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -482,7 +483,7 @@ export const settings = mysqlTable("settings", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-// Audit Logs Table
+
 export const auditLogs = mysqlTable("audit_logs", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }),
@@ -519,6 +520,7 @@ export const permission = mysqlTable("permission", {
   id: varchar("id", { length: 36 }).primaryKey(),
   teacherId: varchar("teacher_id", { length: 36 }).notNull(),
   attendance: boolean("attendance").default(false),
+  subject: boolean("subject").default(false),
   classes: boolean("classes").default(false),
   exam: boolean("exam").default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -531,6 +533,7 @@ export const paymentGateway = mysqlTable("payment_gateway", {
   userId: varchar("user_id", { length: 36 }).notNull(),
   key: varchar("key", { length: 36 }).notNull(),
   secretKey: varchar("secret_key", { length: 36 }).notNull(),
+  isActive: boolean("service").default(true),
   name: varchar("name", { length: 36 }).notNull(),
   callBackUrl: varchar("callback_url", { length: 120 }),
   createdAt: timestamp("created_at").defaultNow(),
@@ -598,3 +601,19 @@ export const accountHistory = mysqlTable("account_hsitory", {
   type: varchar("type", { length: 10 }).notNull(), //CREDIT , DEBIT
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }); 
+
+
+export const schools = mysqlTable("schools", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  schoolName: varchar("school_name", { length: 255 }).notNull(),
+  schoolCode: varchar("school_code", { length: 50 }).unique(),
+
+  affiliation: varchar("affiliation", { length: 100 }),       // CBSE, RBSE, ICSE, etc.
+  affiliationNo: varchar("affiliation_no", { length: 100 }),  // Board affiliation number
+
+  directorName: varchar("director_name", { length: 20 }),
+  principalName: varchar("principal_name", { length: 255 }),
+
+  website: varchar("website", { length: 255 })
+});
