@@ -16,6 +16,7 @@ import subjectsReducer from './slices/subjectsSlice'
 import postReducer from './slices/postSlice'
 import receiptReducer from './slices/reciptSlice'
 import gatewayReducer from './slices/gatewaySlice'
+import permissionReducer from './slices/permissionSlice'
 
 export const store = configureStore({
   reducer: {
@@ -35,7 +36,8 @@ export const store = configureStore({
     library: libraryReducer,
     ui: uiReducer,
     subjects:subjectsReducer,
-    gateway:gatewayReducer
+    gateway:gatewayReducer,
+    permission:permissionReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

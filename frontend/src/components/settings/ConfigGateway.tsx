@@ -76,7 +76,7 @@ interface PaymentGateway {
   user?: User;
 }
 
-export default function PaymentGatewaysPage() {
+export default function ConfigGateway() {
   const dispatch = useAppDispatch();
   const { gateways, loading, pagination } = useAppSelector((state: any) => state.gateway);
   
@@ -200,11 +200,9 @@ export default function PaymentGatewaysPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Payment Gateways" 
-        description="Manage payment gateway integrations"
-       />
-       
+
+      <Card>
+        <CardHeader>     
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
@@ -220,11 +218,6 @@ export default function PaymentGatewaysPage() {
             Add Gateway
           </Button>
         </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>All Gateways</CardTitle>
-          <CardDescription>Manage your payment gateway integrations</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Search */}

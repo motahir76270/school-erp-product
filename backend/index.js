@@ -14,6 +14,7 @@ import postRouter from "./src/routes/post/postAndLikeRoutes.service.js";
 import feesRouter from "./src/routes/fees/feesRoutes.service.js";
 import reciptsRouter from "./src/routes/fees/receiptsRoute.service.js";
 import paymentGatWayRouter from "./src/routes/paymentGateWay/gatewayRoute.service.js";
+import permissionRouter from "./src/routes/permission/permissionRoutes.service.js";
 
 dotenv.config();
 const app = express();
@@ -51,7 +52,9 @@ app.use('/api/posts', postRouter)
 app.use('/api/fees', feesRouter)
 app.use("/api/receipts", reciptsRouter);
 app.use("/api/gateway", paymentGatWayRouter);
-;
+app.use("/api/permissions", permissionRouter);
+
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

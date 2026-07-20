@@ -32,13 +32,14 @@ import {
   settings,
   auditLogs,
   teacherSalaries,
-  permission,
   paymentGateway,
   postLikes,
   posts,
   accounts,
   accountHistory,
   schools,
+  teacherPermission,
+  userPermission,
 } from "./users.js";
 
 // User relations
@@ -50,6 +51,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   accounts: one(accounts),
   schools: one(schools),
   paymentGateway: one(paymentGateway),
+  userPermission:many(userPermission)
 }));
 
 export const schoolRelation = relations(schools, ({ one }) => ({
@@ -110,9 +112,9 @@ export const teachersRelations = relations(teachers, ({ one, many }) => ({
   assignments: many(assignments),
   bookIssues: many(bookIssues),
   salaries: many(teacherSalaries),
-  permission: one(permission, {
+  permission: many(teacherPermission, {
     fields: [teachers.id],
-    references: [permission.teacherId],
+    references: [teacherPermission.teacherId],
   }),
 }));
 
@@ -470,11 +472,20 @@ export const teacherSalariesRelations = relations(
   }),
 );
 
-// Permission relations
-export const permissionRelations = relations(permission, ({ one }) => ({
+// Teacher Permission relations
+export const teacherPermissionRelations = relations(teacherPermission, ({ one }) => ({
   teacher: one(teachers, {
-    fields: [permission.teacherId],
+    fields: [teacherPermission.teacherId],
     references: [teachers.id],
+  }),
+}));
+
+
+// Permission relations
+export const userPermissionRelations = relations(userPermission, ({ one }) => ({
+  user: one(users, {
+    fields: [userPermission.userId],
+    references: [users.id],
   }),
 }));
 

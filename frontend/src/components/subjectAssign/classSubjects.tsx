@@ -41,6 +41,9 @@ import {
   XCircle,
   MoreVertical,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -55,10 +58,13 @@ import {
   removeSubjectFromClassApiCall,
   bulkAssignSubjectsToClassApiCall,
   getSubjectsApiCall,
+  setClassSubjects,
+  setLoading,
+  setError,
+  clearError,
 } from '@/store/slices/subjectsSlice';
 import { getAllClassWithSections } from '@/store/slices/classSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setClassSubjects, setLoading, setError, clearError } from '@/store/slices/subjectsSlice';
 
 interface ClassData {
   id: string;
@@ -80,9 +86,9 @@ interface AssignedSubject {
   subject: SubjectData;
 }
 
-export default function ClassSubjectsPage() {
+export default function ClassSubjects() {
   const dispatch = useAppDispatch();
-  const { classSubjects, classSubjectsMap, isLoading, error } = useAppSelector((state) => state.subjects);
+  const { classSubjects, isLoading, error } = useAppSelector((state) => state.subjects);
   
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
@@ -252,11 +258,18 @@ export default function ClassSubjectsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Class Subjects" 
-        description="Manage subjects assigned to classes"
-      />
-        
+        <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              setSelectedSubjectIds([]);
+              setIsAssignModalOpen(true);
+            }}
+            disabled={!selectedClass}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Bulk Assign Subjects
+          </Button>
+        </div>
 
       {/* Class Selection */}
       <Card>
@@ -405,13 +418,16 @@ export default function ClassSubjectsPage() {
         </CardContent>
       </Card>
 
-      {/* Assign Subjects Modal */}
+      {/* Bulk Assign Subjects Modal */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Assign Subjects to Class</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Bulk Assign Subjects to Class
+            </DialogTitle>
             <DialogDescription>
-              Select subjects to assign to the selected class
+              Select multiple subjects to assign to the selected class at once
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -423,8 +439,31 @@ export default function ClassSubjectsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Available Subjects</Label>
-              <div className="border rounded-md divide-y">
+              <div className="flex items-center justify-between">
+                <Label>Available Subjects</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const available = getAvailableSubjects();
+                      setSelectedSubjectIds(available.map(s => s.id));
+                    }}
+                    disabled={getAvailableSubjects().length === 0}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedSubjectIds([])}
+                    disabled={selectedSubjectIds.length === 0}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+              <div className="border rounded-md divide-y max-h-[400px] overflow-y-auto">
                 {getAvailableSubjects().length === 0 ? (
                   <div className="p-4 text-center text-muted-foreground">
                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
@@ -434,7 +473,7 @@ export default function ClassSubjectsPage() {
                   getAvailableSubjects().map((subject) => (
                     <div
                       key={subject.id}
-                      className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer"
+                      className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer transition-colors"
                       onClick={() => handleSubjectToggle(subject.id)}
                     >
                       <div>
@@ -457,18 +496,13 @@ export default function ClassSubjectsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                Selected: {selectedSubjectIds.length} subjects
+            <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+              <span className="text-sm">
+                Selected: <strong>{selectedSubjectIds.length}</strong> subjects
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedSubjectIds([])}
-                disabled={selectedSubjectIds.length === 0}
-              >
-                Clear All
-              </Button>
+              <span className="text-sm text-muted-foreground">
+                Total available: {getAvailableSubjects().length}
+              </span>
             </div>
 
             <div className="flex gap-3 pt-4 border-t">
@@ -489,7 +523,14 @@ export default function ClassSubjectsPage() {
                 onClick={handleAssignSubjects}
                 disabled={selectedSubjectIds.length === 0 || isSubmitting}
               >
-                {isSubmitting ? 'Assigning...' : `Assign ${selectedSubjectIds.length} Subjects`}
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Assigning...
+                  </>
+                ) : (
+                  `Assign ${selectedSubjectIds.length} Subjects`
+                )}
               </Button>
             </div>
           </div>

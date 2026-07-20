@@ -516,13 +516,31 @@ export const teacherSalaries = mysqlTable("teacher_salaries", {
 });
 
 // Permission Table
-export const permission = mysqlTable("permission", {
+export const teacherPermission = mysqlTable("teacher_permission", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
   teacherId: varchar("teacher_id", { length: 36 }).notNull(),
   attendance: boolean("attendance").default(false),
   subject: boolean("subject").default(false),
   classes: boolean("classes").default(false),
   exam: boolean("exam").default(false),
+  attendance: boolean("attendance").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+export const userPermission = mysqlTable("user_permission", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  attendance: boolean("attendance").default(false),
+  subject: boolean("subject").default(false),
+  classes: boolean("classes").default(false),
+  exam: boolean("exam").default(false),
+  attendance: boolean("attendance").default(false),
+  fee: boolean("fee").default(false),
+  users: boolean("users").default(false),
+  students: boolean("students").default(false),
+  teachers: boolean("teachers").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });

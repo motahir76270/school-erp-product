@@ -1,22 +1,80 @@
-// src/controllers/classSubjectController.js
-import { eq, and } from "drizzle-orm";
+// controllers/subjects/classSubjectController.service.js
+import { eq, and, count, inArray } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../db/db.js";
-import { classSubjects, subjects, classes } from "../../db/schema/users.js";
+import { subjects, classSubjects, classes, sections } from "../../db/schema/users.js";
 import { successResponse, errorResponse } from "../../lib/response.js";
+
+// ==================== GET ALL CLASS SUBJECTS ====================
+export const getAllClassSubjects = async (req, res) => {
+  try {
+    const { limit = 100, offset = 0 } = req.query;
+
+    const allClassSubjects = await db
+      .select()
+      .from(classSubjects)
+      .limit(parseInt(limit))
+      .offset(parseInt(offset));
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(classSubjects);
+
+    // Get subject and class details for each assignment
+    const classSubjectsWithDetails = await Promise.all(
+      allClassSubjects.map(async (assignment) => {
+        const [subject] = await db
+          .select()
+          .from(subjects)
+          .where(eq(subjects.id, assignment.subjectId))
+          .limit(1);
+
+        const [classData] = await db
+          .select()
+          .from(classes)
+          .where(eq(classes.id, assignment.classId))
+          .limit(1);
+
+        return {
+          ...assignment,
+          subject: subject || null,
+          class: classData || null,
+        };
+      })
+    );
+
+    return successResponse(
+      res,
+      {
+        subjects: classSubjectsWithDetails,
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total,
+          hasMore: offset + limit < total,
+        },
+      },
+      "Class subjects fetched successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Get all class subjects error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to get class subjects",
+      500
+    );
+  }
+};
 
 // ==================== ASSIGN SUBJECT TO CLASS ====================
 export const assignSubjectToClass = async (req, res) => {
   try {
-    const { classId, subjectId, teacherId } = req.body;
+    const userId = req.user.id;
+    const { subjectId, classId, teacherId } = req.body;
 
-    // Validate required fields
-    if (!classId || !subjectId) {
-      return errorResponse(
-        res,
-        "Required fields missing: classId, subjectId",
-        400,
-      );
+    if (!subjectId || !classId) {
+      return errorResponse(res, "subjectId and classId are required", 400);
     }
 
     // Check if subject exists
@@ -30,6 +88,10 @@ export const assignSubjectToClass = async (req, res) => {
       return errorResponse(res, "Subject not found", 404);
     }
 
+    if (subject.status !== "active") {
+      return errorResponse(res, "Subject is not active", 400);
+    }
+
     // Check if class exists
     const [classData] = await db
       .select()
@@ -41,37 +103,38 @@ export const assignSubjectToClass = async (req, res) => {
       return errorResponse(res, "Class not found", 404);
     }
 
-    // Check if subject is already assigned to this class
-    const existingAssignment = await db
+    // Check if assignment already exists
+    const [existingAssignment] = await db
       .select()
       .from(classSubjects)
       .where(
         and(
-          eq(classSubjects.classId, classId),
           eq(classSubjects.subjectId, subjectId),
-        ),
+          eq(classSubjects.classId, classId)
+        )
       )
       .limit(1);
 
-    if (existingAssignment.length > 0) {
-      return errorResponse(
-        res,
-        "Subject is already assigned to this class",
-        409,
-      );
+    if (existingAssignment) {
+      return errorResponse(res, "Subject already assigned to this class", 409);
     }
 
     const assignmentId = uuidv4();
 
+    // Insert assignment
+    await db.insert(classSubjects).values({
+      id: assignmentId,
+      subjectId: subjectId,
+      classId: classId,
+      userId: teacherId || userId,
+    });
+
+    // Fetch created assignment
     const [newAssignment] = await db
-      .insert(classSubjects)
-      .values({
-        id: assignmentId,
-        classId: classId,
-        subjectId: subjectId,
-        teacherId: teacherId || null,
-      })
-      .returning();
+      .select()
+      .from(classSubjects)
+      .where(eq(classSubjects.id, assignmentId))
+      .limit(1);
 
     if (!newAssignment) {
       return errorResponse(res, "Failed to assign subject to class", 500);
@@ -81,11 +144,256 @@ export const assignSubjectToClass = async (req, res) => {
       res,
       newAssignment,
       "Subject assigned to class successfully",
-      201,
+      201
     );
   } catch (error) {
     console.error("Assign subject to class error:", error);
     return errorResponse(res, error.message || "Failed to assign subject", 500);
+  }
+};
+
+// ==================== BULK ASSIGN SUBJECTS TO CLASS ====================
+export const bulkAssignSubjectsToClass = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { classId, subjects: subjectList } = req.body;
+
+    if (!classId || !subjectList || !Array.isArray(subjectList) || subjectList.length === 0) {
+      return errorResponse(
+        res,
+        "classId and subjects array are required",
+        400
+      );
+    }
+
+    // Check if class exists
+    const [classData] = await db
+      .select()
+      .from(classes)
+      .where(eq(classes.id, classId))
+      .limit(1);
+
+    if (!classData) {
+      return errorResponse(res, "Class not found", 404);
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const item of subjectList) {
+      const { subjectId, teacherId } = item;
+
+      try {
+        // Check if subject exists
+        const [subject] = await db
+          .select()
+          .from(subjects)
+          .where(eq(subjects.id, subjectId))
+          .limit(1);
+
+        if (!subject) {
+          errors.push({ subjectId, error: "Subject not found" });
+          continue;
+        }
+
+        if (subject.status !== "active") {
+          errors.push({ subjectId, error: "Subject is not active" });
+          continue;
+        }
+
+        // Check if assignment already exists
+        const [existingAssignment] = await db
+          .select()
+          .from(classSubjects)
+          .where(
+            and(
+              eq(classSubjects.subjectId, subjectId),
+              eq(classSubjects.classId, classId)
+            )
+          )
+          .limit(1);
+
+        if (existingAssignment) {
+          errors.push({
+            subjectId,
+            error: "Subject already assigned to this class",
+          });
+          continue;
+        }
+
+        const assignmentId = uuidv4();
+
+        await db.insert(classSubjects).values({
+          id: assignmentId,
+          subjectId: subjectId,
+          classId: classId,
+          userId: teacherId || userId,
+        });
+
+        // Get subject details for response
+        const [subjectDetails] = await db
+          .select()
+          .from(subjects)
+          .where(eq(subjects.id, subjectId))
+          .limit(1);
+
+        results.push({
+          id: assignmentId,
+          subjectId: subjectId,
+          classId: classId,
+          userId: teacherId || userId,
+          subject: subjectDetails,
+        });
+      } catch (error) {
+        errors.push({ subjectId, error: error.message });
+      }
+    }
+
+    return successResponse(
+      res,
+      {
+        data: {
+          totalAssigned: results.length,
+          totalErrors: errors.length,
+          assigned: results,
+          errors: errors,
+        },
+      },
+      `${results.length} subjects assigned successfully`,
+      200
+    );
+  } catch (error) {
+    console.error("Bulk assign subjects to class error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to bulk assign subjects",
+      500
+    );
+  }
+};
+
+// ==================== BULK ASSIGN SUBJECTS TO SECTION ====================
+export const bulkAssignSubjectsToSection = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { sectionId, subjects: subjectList } = req.body;
+
+    if (!sectionId || !subjectList || !Array.isArray(subjectList) || subjectList.length === 0) {
+      return errorResponse(
+        res,
+        "sectionId and subjects array are required",
+        400
+      );
+    }
+
+    // Check if section exists
+    const [sectionData] = await db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, sectionId))
+      .limit(1);
+
+    if (!sectionData) {
+      return errorResponse(res, "Section not found", 404);
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Get the class ID from section
+    const classId = sectionData.classId;
+
+    for (const item of subjectList) {
+      const { subjectId, teacherId } = item;
+
+      try {
+        // Check if subject exists
+        const [subject] = await db
+          .select()
+          .from(subjects)
+          .where(eq(subjects.id, subjectId))
+          .limit(1);
+
+        if (!subject) {
+          errors.push({ subjectId, error: "Subject not found" });
+          continue;
+        }
+
+        if (subject.status !== "active") {
+          errors.push({ subjectId, error: "Subject is not active" });
+          continue;
+        }
+
+        // Check if assignment already exists for this class
+        const [existingAssignment] = await db
+          .select()
+          .from(classSubjects)
+          .where(
+            and(
+              eq(classSubjects.subjectId, subjectId),
+              eq(classSubjects.classId, classId)
+            )
+          )
+          .limit(1);
+
+        if (existingAssignment) {
+          errors.push({
+            subjectId,
+            error: "Subject already assigned to this class",
+          });
+          continue;
+        }
+
+        const assignmentId = uuidv4();
+
+        await db.insert(classSubjects).values({
+          id: assignmentId,
+          subjectId: subjectId,
+          classId: classId,
+          userId: teacherId || userId,
+        });
+
+        // Get subject details for response
+        const [subjectDetails] = await db
+          .select()
+          .from(subjects)
+          .where(eq(subjects.id, subjectId))
+          .limit(1);
+
+        results.push({
+          id: assignmentId,
+          subjectId: subjectId,
+          classId: classId,
+          sectionId: sectionId,
+          userId: teacherId || userId,
+          subject: subjectDetails,
+          section: sectionData,
+        });
+      } catch (error) {
+        errors.push({ subjectId, error: error.message });
+      }
+    }
+
+    return successResponse(
+      res,
+      {
+        data: {
+          totalAssigned: results.length,
+          totalErrors: errors.length,
+          assigned: results,
+          errors: errors,
+        },
+      },
+      `${results.length} subjects assigned to section successfully`,
+      200
+    );
+  } catch (error) {
+    console.error("Bulk assign subjects to section error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to bulk assign subjects to section",
+      500
+    );
   }
 };
 
@@ -98,28 +406,15 @@ export const getSubjectsByClass = async (req, res) => {
       return errorResponse(res, "Class ID is required", 400);
     }
 
-    // Get class subject assignments
-    const assignments = await db
+    // Get all assignments for this class
+    const classSubjectAssignments = await db
       .select()
       .from(classSubjects)
       .where(eq(classSubjects.classId, classId));
 
-    if (assignments.length === 0) {
-      return successResponse(
-        res,
-        {
-          classId: classId,
-          subjects: [],
-          totalSubjects: 0,
-        },
-        "No subjects assigned to this class",
-        200,
-      );
-    }
-
     // Get subject details for each assignment
     const subjectsWithDetails = await Promise.all(
-      assignments.map(async (assignment) => {
+      classSubjectAssignments.map(async (assignment) => {
         const [subject] = await db
           .select()
           .from(subjects)
@@ -127,25 +422,105 @@ export const getSubjectsByClass = async (req, res) => {
           .limit(1);
 
         return {
-          assignment: assignment,
+          id: assignment.id,
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+          userId: assignment.userId,
+          createdAt: assignment.createdAt,
           subject: subject || null,
         };
-      }),
+      })
     );
 
     return successResponse(
       res,
       {
-        classId: classId,
-        subjects: subjectsWithDetails,
-        totalSubjects: subjectsWithDetails.length,
+        data: {
+          classId: classId,
+          subjects: subjectsWithDetails,
+          total: subjectsWithDetails.length,
+        },
       },
-      "Subjects fetched by class successfully",
-      200,
+      "Class subjects fetched successfully",
+      200
     );
   } catch (error) {
     console.error("Get subjects by class error:", error);
-    return errorResponse(res, error.message || "Failed to get subjects", 500);
+    return errorResponse(
+      res,
+      error.message || "Failed to get class subjects",
+      500
+    );
+  }
+};
+
+// ==================== GET SUBJECTS BY SECTION ====================
+export const getSubjectsBySection = async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+
+    if (!sectionId) {
+      return errorResponse(res, "Section ID is required", 400);
+    }
+
+    // Check if section exists
+    const [sectionData] = await db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, sectionId))
+      .limit(1);
+
+    if (!sectionData) {
+      return errorResponse(res, "Section not found", 404);
+    }
+
+    // Get all subjects assigned to the class of this section
+    const classSubjectAssignments = await db
+      .select()
+      .from(classSubjects)
+      .where(eq(classSubjects.classId, sectionData.classId));
+
+    // Get subject details for each assignment
+    const subjectsWithDetails = await Promise.all(
+      classSubjectAssignments.map(async (assignment) => {
+        const [subject] = await db
+          .select()
+          .from(subjects)
+          .where(eq(subjects.id, assignment.subjectId))
+          .limit(1);
+
+        return {
+          id: assignment.id,
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+          userId: assignment.userId,
+          createdAt: assignment.createdAt,
+          subject: subject || null,
+        };
+      })
+    );
+
+    return successResponse(
+      res,
+      {
+        data: {
+          sectionId: sectionId,
+          classId: sectionData.classId,
+          sectionName: sectionData.name,
+          subjects: subjectsWithDetails,
+          total: subjectsWithDetails.length,
+        },
+      },
+      "Section subjects fetched successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Get subjects by section error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to get section subjects",
+      500
+    );
   }
 };
 
@@ -158,27 +533,25 @@ export const getClassesBySubject = async (req, res) => {
       return errorResponse(res, "Subject ID is required", 400);
     }
 
-    // Get class subject assignments
+    // Check if subject exists
+    const [subject] = await db
+      .select()
+      .from(subjects)
+      .where(eq(subjects.id, subjectId))
+      .limit(1);
+
+    if (!subject) {
+      return errorResponse(res, "Subject not found", 404);
+    }
+
+    // Get all assignments for this subject
     const assignments = await db
       .select()
       .from(classSubjects)
       .where(eq(classSubjects.subjectId, subjectId));
 
-    if (assignments.length === 0) {
-      return successResponse(
-        res,
-        {
-          subjectId: subjectId,
-          classes: [],
-          totalClasses: 0,
-        },
-        "Subject not assigned to any class",
-        200,
-      );
-    }
-
-    // Get class details for each assignment
-    const classesWithDetails = await Promise.all(
+    // Get class details
+    const classDetails = await Promise.all(
       assignments.map(async (assignment) => {
         const [classData] = await db
           .select()
@@ -187,29 +560,38 @@ export const getClassesBySubject = async (req, res) => {
           .limit(1);
 
         return {
-          assignment: assignment,
-          class: classData || null,
+          assignmentId: assignment.id,
+          classId: assignment.classId,
+          className: classData?.name || null,
+          teacherId: assignment.userId,
         };
-      }),
+      })
     );
 
     return successResponse(
       res,
       {
-        subjectId: subjectId,
-        classes: classesWithDetails,
-        totalClasses: classesWithDetails.length,
+        data: {
+          subjectId: subjectId,
+          subjectName: subject.name,
+          classes: classDetails,
+          total: classDetails.length,
+        },
       },
-      "Classes fetched by subject successfully",
-      200,
+      "Classes by subject fetched successfully",
+      200
     );
   } catch (error) {
     console.error("Get classes by subject error:", error);
-    return errorResponse(res, error.message || "Failed to get classes", 500);
+    return errorResponse(
+      res,
+      error.message || "Failed to get classes by subject",
+      500
+    );
   }
 };
 
-// ==================== UPDATE CLASS SUBJECT ASSIGNMENT ====================
+// ==================== UPDATE CLASS SUBJECT ====================
 export const updateClassSubject = async (req, res) => {
   try {
     const { id } = req.params;
@@ -230,34 +612,36 @@ export const updateClassSubject = async (req, res) => {
     }
 
     const updateData = {};
-    if (teacherId !== undefined) updateData.teacherId = teacherId;
+    if (teacherId !== undefined) updateData.userId = teacherId;
 
     if (Object.keys(updateData).length === 0) {
       return errorResponse(res, "No data provided for update", 400);
     }
 
-    const [updatedAssignment] = await db
+    await db
       .update(classSubjects)
       .set(updateData)
-      .where(eq(classSubjects.id, id))
-      .returning();
+      .where(eq(classSubjects.id, id));
 
-    if (!updatedAssignment) {
-      return errorResponse(res, "Failed to update assignment", 500);
-    }
+    // Fetch updated assignment
+    const [updatedAssignment] = await db
+      .select()
+      .from(classSubjects)
+      .where(eq(classSubjects.id, id))
+      .limit(1);
 
     return successResponse(
       res,
       updatedAssignment,
-      "Class subject assignment updated successfully",
-      200,
+      "Assignment updated successfully",
+      200
     );
   } catch (error) {
     console.error("Update class subject error:", error);
     return errorResponse(
       res,
       error.message || "Failed to update assignment",
-      500,
+      500
     );
   }
 };
@@ -281,173 +665,21 @@ export const removeSubjectFromClass = async (req, res) => {
       return errorResponse(res, "Assignment not found", 404);
     }
 
+    // Hard delete (or you can soft delete if you have a status column)
     await db.delete(classSubjects).where(eq(classSubjects.id, id));
 
     return successResponse(
       res,
       null,
       "Subject removed from class successfully",
-      200,
+      200
     );
   } catch (error) {
     console.error("Remove subject from class error:", error);
-    return errorResponse(res, error.message || "Failed to remove subject", 500);
-  }
-};
-
-// ==================== GET ALL CLASS SUBJECTS ====================
-export const getAllClassSubjects = async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 100;
-    const offset = parseInt(req.query.offset) || 0;
-
-    const allAssignments = await db
-      .select()
-      .from(classSubjects)
-      .limit(limit)
-      .offset(offset);
-
-    const total = allAssignments.length;
-
-    // Get details for each assignment
-    const assignmentsWithDetails = await Promise.all(
-      allAssignments.map(async (assignment) => {
-        const [subject] = await db
-          .select()
-          .from(subjects)
-          .where(eq(subjects.id, assignment.subjectId))
-          .limit(1);
-
-        const [classData] = await db
-          .select()
-          .from(classes)
-          .where(eq(classes.id, assignment.classId))
-          .limit(1);
-
-        return {
-          ...assignment,
-          subject: subject || null,
-          class: classData || null,
-        };
-      }),
-    );
-
-    return successResponse(
-      res,
-      {
-        assignments: assignmentsWithDetails,
-        pagination: {
-          limit,
-          offset,
-          total,
-          hasMore: total === limit,
-        },
-      },
-      "Class subjects fetched successfully",
-      200,
-    );
-  } catch (error) {
-    console.error("Get all class subjects error:", error);
     return errorResponse(
       res,
-      error.message || "Failed to get class subjects",
-      500,
-    );
-  }
-};
-
-// ==================== BULK ASSIGN SUBJECTS TO CLASS ====================
-export const bulkAssignSubjectsToClass = async (req, res) => {
-  try {
-    const { classId, subjects: subjectList } = req.body;
-
-    if (
-      !classId ||
-      !subjectList ||
-      !Array.isArray(subjectList) ||
-      subjectList.length === 0
-    ) {
-      return errorResponse(
-        res,
-        "Required fields missing: classId, subjects array",
-        400,
-      );
-    }
-
-    // Check if class exists
-    const [classData] = await db
-      .select()
-      .from(classes)
-      .where(eq(classes.id, classId))
-      .limit(1);
-
-    if (!classData) {
-      return errorResponse(res, "Class not found", 404);
-    }
-
-    const assignments = [];
-
-    for (const item of subjectList) {
-      const { subjectId, teacherId } = item;
-
-      // Check if subject exists
-      const [subject] = await db
-        .select()
-        .from(subjects)
-        .where(eq(subjects.id, subjectId))
-        .limit(1);
-
-      if (!subject) {
-        continue; // Skip if subject not found
-      }
-
-      // Check if already assigned
-      const existingAssignment = await db
-        .select()
-        .from(classSubjects)
-        .where(
-          and(
-            eq(classSubjects.classId, classId),
-            eq(classSubjects.subjectId, subjectId),
-          ),
-        )
-        .limit(1);
-
-      if (existingAssignment.length > 0) {
-        continue; // Skip if already assigned
-      }
-
-      const [newAssignment] = await db
-        .insert(classSubjects)
-        .values({
-          id: uuidv4(),
-          classId: classId,
-          subjectId: subjectId,
-          teacherId: teacherId || null,
-        })
-        .returning();
-
-      if (newAssignment) {
-        assignments.push(newAssignment);
-      }
-    }
-
-    return successResponse(
-      res,
-      {
-        classId: classId,
-        assigned: assignments,
-        totalAssigned: assignments.length,
-      },
-      "Bulk subjects assigned to class successfully",
-      201,
-    );
-  } catch (error) {
-    console.error("Bulk assign subjects error:", error);
-    return errorResponse(
-      res,
-      error.message || "Failed to assign subjects",
-      500,
+      error.message || "Failed to remove subject",
+      500
     );
   }
 };

@@ -12,11 +12,13 @@ import {
 import {
   assignSubjectToClass,
   getSubjectsByClass,
+  getSubjectsBySection,
   getClassesBySubject,
   updateClassSubject,
   removeSubjectFromClass,
   getAllClassSubjects,
   bulkAssignSubjectsToClass,
+  bulkAssignSubjectsToSection,
 } from "../controllers/subjects/classSubjectController.service.js";
 import {
   authMiddleware,
@@ -26,8 +28,6 @@ import {
 const subjectRouter = Router();
 
 // ==================== SUBJECT ROUTES ====================
-
-// Public/Protected routes
 subjectRouter.get(
   "/",
   authMiddleware,
@@ -41,7 +41,6 @@ subjectRouter.get(
   getSubjectById,
 );
 
-// Admin only routes
 subjectRouter.post(
   "/",
   authMiddleware,
@@ -74,8 +73,6 @@ subjectRouter.patch(
 );
 
 // ==================== CLASS SUBJECT ROUTES ====================
-
-// Get all class subjects
 subjectRouter.get(
   "/assignments",
   authMiddleware,
@@ -83,7 +80,6 @@ subjectRouter.get(
   getAllClassSubjects,
 );
 
-// Assign subject to class
 subjectRouter.post(
   "/assign",
   authMiddleware,
@@ -91,15 +87,20 @@ subjectRouter.post(
   assignSubjectToClass,
 );
 
-// Bulk assign subjects to class
 subjectRouter.post(
-  "/assign/bulk",
+  "/assign/bulk/class",
   authMiddleware,
   roleMiddleware(["super_admin", "admin"]),
   bulkAssignSubjectsToClass,
 );
 
-// Get subjects by class
+subjectRouter.post(
+  "/assign/bulk/section",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  bulkAssignSubjectsToSection,
+);
+
 subjectRouter.get(
   "/class/:classId",
   authMiddleware,
@@ -107,7 +108,13 @@ subjectRouter.get(
   getSubjectsByClass,
 );
 
-// Get classes by subject
+subjectRouter.get(
+  "/section/:sectionId",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin", "teacher"]),
+  getSubjectsBySection,
+);
+
 subjectRouter.get(
   "/subject/:subjectId/classes",
   authMiddleware,
@@ -115,7 +122,6 @@ subjectRouter.get(
   getClassesBySubject,
 );
 
-// Update class subject assignment
 subjectRouter.put(
   "/assign/:id",
   authMiddleware,
@@ -123,7 +129,6 @@ subjectRouter.put(
   updateClassSubject,
 );
 
-// Remove subject from class
 subjectRouter.delete(
   "/assign/:id",
   authMiddleware,

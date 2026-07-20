@@ -1,0 +1,1 @@
+ALTER TABLE `teacher_permission` ADD `user_id` varchar(36) NOT NULL;

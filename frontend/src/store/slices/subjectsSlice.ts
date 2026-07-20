@@ -1,4 +1,4 @@
-// store/slices/subjectSlice.ts
+// store/slices/subjectsSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 
@@ -32,13 +32,19 @@ export interface ClassSubject {
     id: string;
     name: string;
   };
+  section?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface SubjectState {
   subjects: Subject[];
   currentSubject: Subject | null;
   classSubjects: ClassSubject[];
+  sectionSubjects: ClassSubject[];
   classSubjectsMap: Record<string, ClassSubject[]>;
+  sectionSubjectsMap: Record<string, ClassSubject[]>;
   subjectClassesMap: Record<string, any[]>;
   isLoading: boolean;
   isSubmitting: boolean;
@@ -57,13 +63,13 @@ interface SubjectState {
   };
 }
 
-// ==================== INITIAL STATE ====================
-
 const initialState: SubjectState = {
   subjects: [],
   currentSubject: null,
   classSubjects: [],
+  sectionSubjects: [],
   classSubjectsMap: {},
+  sectionSubjectsMap: {},
   subjectClassesMap: {},
   isLoading: false,
   isSubmitting: false,
@@ -81,8 +87,6 @@ const initialState: SubjectState = {
     hasMore: false,
   },
 };
-
-// ==================== SLICE ====================
 
 const subjectSlice = createSlice({
   name: 'subjects',
@@ -109,8 +113,14 @@ const subjectSlice = createSlice({
     setClassSubjects: (state, action: PayloadAction<ClassSubject[]>) => {
       state.classSubjects = action.payload;
     },
+    setSectionSubjects: (state, action: PayloadAction<ClassSubject[]>) => {
+      state.sectionSubjects = action.payload;
+    },
     setClassSubjectsMap: (state, action: PayloadAction<{ classId: string; subjects: ClassSubject[] }>) => {
       state.classSubjectsMap[action.payload.classId] = action.payload.subjects;
+    },
+    setSectionSubjectsMap: (state, action: PayloadAction<{ sectionId: string; subjects: ClassSubject[] }>) => {
+      state.sectionSubjectsMap[action.payload.sectionId] = action.payload.subjects;
     },
     setSubjectClassesMap: (state, action: PayloadAction<{ subjectId: string; classes: any[] }>) => {
       state.subjectClassesMap[action.payload.subjectId] = action.payload.classes;
@@ -146,10 +156,25 @@ const subjectSlice = createSlice({
         state.classSubjectsMap[classId].push(action.payload);
       }
     },
+    addSectionSubject: (state, action: PayloadAction<ClassSubject>) => {
+      state.sectionSubjects.push(action.payload);
+      const sectionId = action.payload.classId; // Using classId as sectionId for now
+      if (state.sectionSubjectsMap[sectionId]) {
+        state.sectionSubjectsMap[sectionId].push(action.payload);
+      }
+    },
     removeClassSubjectFromState: (state, action: PayloadAction<string>) => {
       state.classSubjects = state.classSubjects.filter(cs => cs.id !== action.payload);
       Object.keys(state.classSubjectsMap).forEach(key => {
         state.classSubjectsMap[key] = state.classSubjectsMap[key].filter(
+          cs => cs.id !== action.payload
+        );
+      });
+    },
+    removeSectionSubjectFromState: (state, action: PayloadAction<string>) => {
+      state.sectionSubjects = state.sectionSubjects.filter(cs => cs.id !== action.payload);
+      Object.keys(state.sectionSubjectsMap).forEach(key => {
+        state.sectionSubjectsMap[key] = state.sectionSubjectsMap[key].filter(
           cs => cs.id !== action.payload
         );
       });
@@ -160,14 +185,14 @@ const subjectSlice = createSlice({
     clearSubjects: (state) => {
       state.subjects = [];
       state.classSubjects = [];
+      state.sectionSubjects = [];
       state.classSubjectsMap = {};
+      state.sectionSubjectsMap = {};
       state.subjectClassesMap = {};
     },
     resetSubjectState: () => initialState,
   },
 });
-
-// ==================== ACTIONS ====================
 
 export const {
   setLoading,
@@ -177,7 +202,9 @@ export const {
   setSubjects,
   setCurrentSubject,
   setClassSubjects,
+  setSectionSubjects,
   setClassSubjectsMap,
+  setSectionSubjectsMap,
   setSubjectClassesMap,
   setPagination,
   setClassSubjectsPagination,
@@ -185,7 +212,9 @@ export const {
   updateSubjectInState,
   removeSubjectFromState,
   addClassSubject,
+  addSectionSubject,
   removeClassSubjectFromState,
+  removeSectionSubjectFromState,
   clearCurrentSubject,
   clearSubjects,
   resetSubjectState,
@@ -193,9 +222,8 @@ export const {
 
 // ==================== API CALLS ====================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || '';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/subjects` || '';
 
-// Helper function for headers
 const getHeaders = (token?: string) => ({
   headers: {
     'Content-Type': 'application/json',
@@ -203,120 +231,73 @@ const getHeaders = (token?: string) => ({
   },
 });
 
-// Helper function to handle errors
 const handleApiError = (error: any): never => {
   const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
   throw { success: false, message: errorMessage };
 };
 
-// ==================== SUBJECT API CALLS ====================
-
-// Create Subject
-export const createSubjectApiCall = async (token: string, payload: {
-  name: string;
-  code: string;
-  type?: 'theory' | 'practical';
-  maxMarks?: number;
-  passMarks?: number;
-}) => {
+// Subject CRUD
+export const createSubjectApiCall = async (token: string, payload: any) => {
   try {
-    const { data } = await axios.post(
-      `${API_BASE_URL}/api/subjects`,
-      payload,
-      getHeaders(token)
-    );
+    const { data } = await axios.post(`${API_BASE_URL}`, payload, getHeaders(token));
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Get All Subjects
-export const getSubjectsApiCall = async (token: string, params?: {
-  page?: number;
-  limit?: number;
-  status?: string;
-  type?: string;
-}) => {
+export const getSubjectsApiCall = async (token: string, params?: any) => {
   try {
-    const { data } = await axios.get(
-      `${API_BASE_URL}/api/subjects`,
-      {
-        ...getHeaders(token),
-        params,
-      }
-    );
+    const { data } = await axios.get(`${API_BASE_URL}`, {
+      ...getHeaders(token),
+      params,
+    });
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Get Subject by ID
 export const getSubjectByIdApiCall = async (token: string, id: string) => {
   try {
-    const { data } = await axios.get(
-      `${API_BASE_URL}/api/subjects/${id}`,
-      getHeaders(token)
-    );
+    const { data } = await axios.get(`${API_BASE_URL}/${id}`, getHeaders(token));
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Update Subject
-export const updateSubjectApiCall = async (token: string, id: string, payload: {
-  name?: string;
-  code?: string;
-  type?: 'theory' | 'practical';
-  maxMarks?: number;
-  passMarks?: number;
-  status?: 'active' | 'inactive';
-}) => {
+export const updateSubjectApiCall = async (token: string, id: string, payload: any) => {
   try {
-    const { data } = await axios.put(
-      `${API_BASE_URL}/api/subjects/${id}`,
-      payload,
-      getHeaders(token)
-    );
+    const { data } = await axios.put(`${API_BASE_URL}/${id}`, payload, getHeaders(token));
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Delete Subject (Soft Delete)
 export const deleteSubjectApiCall = async (token: string, id: string) => {
   try {
-    const { data } = await axios.delete(
-      `${API_BASE_URL}/api/subjects/${id}`,
-      getHeaders(token)
-    );
+    const { data } = await axios.delete(`${API_BASE_URL}/${id}`, getHeaders(token));
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Hard Delete Subject
 export const hardDeleteSubjectApiCall = async (token: string, id: string) => {
   try {
-    const { data } = await axios.delete(
-      `${API_BASE_URL}/api/subjects/hard/${id}`,
-      getHeaders(token)
-    );
+    const { data } = await axios.delete(`${API_BASE_URL}/hard/${id}`, getHeaders(token));
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Update Subject Status
 export const updateSubjectStatusApiCall = async (token: string, id: string, status: 'active' | 'inactive') => {
   try {
     const { data } = await axios.patch(
-      `${API_BASE_URL}/api/subjects/status/${id}`,
+      `${API_BASE_URL}/status/${id}`,
       { status },
       getHeaders(token)
     );
@@ -326,37 +307,27 @@ export const updateSubjectStatusApiCall = async (token: string, id: string, stat
   }
 };
 
-// ==================== CLASS SUBJECT API CALLS ====================
-
-// Assign Subject to Class
+// Class Subject Assignments
 export const assignSubjectToClassApiCall = async (token: string, payload: {
   classId: string;
   subjectId: string;
   teacherId?: string;
 }) => {
   try {
-    const { data } = await axios.post(
-      `${API_BASE_URL}/api/subjects/assign`,
-      payload,
-      getHeaders(token)
-    );
+    const { data } = await axios.post(`${API_BASE_URL}/assign`, payload, getHeaders(token));
     return data;
   } catch (error: any) {
     return handleApiError(error);
   }
 };
 
-// Bulk Assign Subjects to Class
 export const bulkAssignSubjectsToClassApiCall = async (token: string, payload: {
   classId: string;
-  subjects: Array<{
-    subjectId: string;
-    teacherId?: string;
-  }>;
+  subjects: Array<{ subjectId: string; teacherId?: string }>;
 }) => {
   try {
     const { data } = await axios.post(
-      `${API_BASE_URL}/api/subjects/assign/bulk`,
+      `${API_BASE_URL}/assign/bulk/class`,
       payload,
       getHeaders(token)
     );
@@ -366,11 +337,26 @@ export const bulkAssignSubjectsToClassApiCall = async (token: string, payload: {
   }
 };
 
-// Get Subjects by Class
+export const bulkAssignSubjectsToSectionApiCall = async (token: string, payload: {
+  sectionId: string;
+  subjects: Array<{ subjectId: string; teacherId?: string }>;
+}) => {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE_URL}/assign/bulk/section`,
+      payload,
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
 export const getSubjectsByClassApiCall = async (token: string, classId: string) => {
   try {
     const { data } = await axios.get(
-      `${API_BASE_URL}/api/subjects/class/${classId}`,
+      `${API_BASE_URL}/class/${classId}`,
       getHeaders(token)
     );
     return data;
@@ -379,11 +365,22 @@ export const getSubjectsByClassApiCall = async (token: string, classId: string) 
   }
 };
 
-// Get Classes by Subject
+export const getSubjectsBySectionApiCall = async (token: string, sectionId: string) => {
+  try {
+    const { data } = await axios.get(
+      `${API_BASE_URL}/section/${sectionId}`,
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
 export const getClassesBySubjectApiCall = async (token: string, subjectId: string) => {
   try {
     const { data } = await axios.get(
-      `${API_BASE_URL}/api/subjects/subject/${subjectId}/classes`,
+      `${API_BASE_URL}/subject/${subjectId}/classes`,
       getHeaders(token)
     );
     return data;
@@ -392,14 +389,10 @@ export const getClassesBySubjectApiCall = async (token: string, subjectId: strin
   }
 };
 
-// Get All Class Subjects
-export const getAllClassSubjectsApiCall = async (token: string, params?: {
-  limit?: number;
-  offset?: number;
-}) => {
+export const getAllClassSubjectsApiCall = async (token: string, params?: any) => {
   try {
     const { data } = await axios.get(
-      `${API_BASE_URL}/api/subjects/assignments`,
+      `${API_BASE_URL}/assignments`,
       {
         ...getHeaders(token),
         params,
@@ -411,13 +404,12 @@ export const getAllClassSubjectsApiCall = async (token: string, params?: {
   }
 };
 
-// Update Class Subject Assignment
 export const updateClassSubjectApiCall = async (token: string, id: string, payload: {
   teacherId?: string;
 }) => {
   try {
     const { data } = await axios.put(
-      `${API_BASE_URL}/api/subjects/assign/${id}`,
+      `${API_BASE_URL}/assign/${id}`,
       payload,
       getHeaders(token)
     );
@@ -427,11 +419,10 @@ export const updateClassSubjectApiCall = async (token: string, id: string, paylo
   }
 };
 
-// Remove Subject from Class
 export const removeSubjectFromClassApiCall = async (token: string, assignmentId: string) => {
   try {
     const { data } = await axios.delete(
-      `${API_BASE_URL}/api/subjects/assign/${assignmentId}`,
+      `${API_BASE_URL}/assign/${assignmentId}`,
       getHeaders(token)
     );
     return data;
@@ -440,6 +431,6 @@ export const removeSubjectFromClassApiCall = async (token: string, assignmentId:
   }
 };
 
-// ==================== EXPORT ====================
+
 
 export default subjectSlice.reducer;

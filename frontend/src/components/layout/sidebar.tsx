@@ -48,7 +48,7 @@ const menuItems = {
     { icon: Library, label: 'Library', href: '/dashboard/admin/library' },
     { icon: FileText, label: 'Notices', href: '/dashboard/admin/notices' },
     { icon: Bell, label: 'Events', href: '/dashboard/admin/events' },
-    { icon: Settings, label: 'GateWay', href: '/dashboard/admin/gateway' },
+    { icon: Settings, label: 'Permissions', href: '/dashboard/admin/permission' },
     { icon: Settings, label: 'Settings', href: '/dashboard/admin/settings' },
   ],
   admin: [
