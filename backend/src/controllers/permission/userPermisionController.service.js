@@ -1,9 +1,11 @@
 // src/controllers/userPermissionController.js
-import { and, eq, ilike, or, sql} from "drizzle-orm";
+import { and, eq, inArray, like, or, sql} from "drizzle-orm";
 import { db } from "../../db/db.js";
 import { userPermission, users } from "../../db/schema/users.js";
 import { errorResponse, successResponse } from "../../lib/response.js";
 import { v4 as uuidv4 } from 'uuid';
+
+
 
 // ==================== GET all user permissions ====================
 export const getAllUserPermissions = async (req, res) => {
@@ -14,23 +16,52 @@ export const getAllUserPermissions = async (req, res) => {
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    const whereConditions = [];
+    // Step 1: Get all unique user IDs that have permissions
+    const permissionUsers = await db
+      .selectDistinct({
+        userId: userPermission.userId,
+      })
+      .from(userPermission);
+
+    const userIds = permissionUsers.map((item) => item.userId);
+
+    // If no permissions assigned
+    if (userIds.length === 0) {
+      return successResponse(
+        res,
+        {
+          users: [],
+          pagination: {
+            currentPage: pageNum,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: limitNum,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        },
+        "Users fetched successfully",
+        200,
+      );
+    }
+
+    const whereConditions = [
+      inArray(users.id, userIds), // Only users having permissions
+    ];
 
     if (search) {
       whereConditions.push(
         or(
-          sql`${users.firstName} || ' ' || ${users.lastName} ILIKE ${`%${search}%`}`,
-          ilike(users.firstName, `%${search}%`),
-          ilike(users.lastName, `%${search}%`),
-          ilike(users.email, `%${search}%`)
-        )
+          like(users.firstName, `%${search}%`),
+          like(users.lastName, `%${search}%`),
+          like(users.email, `%${search}%`),
+        ),
       );
     }
 
-    const whereClause =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    const whereClause = and(...whereConditions);
 
-    // Total users
+    // Total users count
     const totalResult = await db
       .select({ count: sql`count(*)` })
       .from(users)
@@ -38,7 +69,7 @@ export const getAllUserPermissions = async (req, res) => {
 
     const totalCount = Number(totalResult[0]?.count ?? 0);
 
-    // Users with permissions
+    // Fetch users with permissions
     const userData = await db.query.users.findMany({
       where: whereClause,
       with: {
@@ -62,78 +93,15 @@ export const getAllUserPermissions = async (req, res) => {
         },
       },
       "Users fetched successfully",
-      200
+      200,
     );
   } catch (error) {
     console.error(error);
 
-    return errorResponse(
-      res,
-      error.message || "Failed to fetch users",
-      500
-    );
+    return errorResponse(res, error.message || "Failed to fetch users", 500);
   }
 };
 
-// ==================== GET user permission by ID ====================
-export const getUserPermissionById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const permission = await db
-      .select()
-      .from(userPermission)
-      .where(eq(userPermission.id, id));
-
-    if (!permission || permission.length === 0) {
-      return errorResponse(res, "User permission not found", 404);
-    }
-
-    return successResponse(
-      res,
-      permission[0],
-      "User permission fetched successfully",
-      200
-    );
-  } catch (error) {
-    console.error("Error fetching user permission:", error);
-    return errorResponse(
-      res,
-      error.message || "Failed to fetch user permission",
-      500
-    );
-  }
-};
-
-// ==================== GET user permission by user ID ====================
-export const getUserPermissionByUserId = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const permission = await db
-      .select()
-      .from(userPermission)
-      .where(eq(userPermission.userId, userId));
-
-    if (!permission || permission.length === 0) {
-      return errorResponse(res, "User permission not found", 404);
-    }
-
-    return successResponse(
-      res,
-      permission[0],
-      "User permission fetched successfully",
-      200
-    );
-  } catch (error) {
-    console.error("Error fetching user permission:", error);
-    return errorResponse(
-      res,
-      error.message || "Failed to fetch user permission",
-      500
-    );
-  }
-};
 
 // ==================== POST create user permission ====================
 export const createUserPermission = async (req, res) => {
@@ -206,7 +174,7 @@ export const createUserPermission = async (req, res) => {
 // ==================== PUT update user permission ====================
 export const updateUserPermission = async (req, res) => {
   try {
-    const { id } = req.params;
+    const  id  = req.params;
     const { 
       attendance, 
       subject, 
@@ -273,7 +241,10 @@ export const updateUserPermission = async (req, res) => {
 // ==================== PATCH update user permission status ====================
 export const updateUserPermissionStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const  {id}  = req.params ;
+    console.log('====================================');
+    console.log(id);
+    console.log('====================================');
     const { permission, value } = req.body;
 
     const validPermissions = [
@@ -298,35 +269,31 @@ export const updateUserPermissionStatus = async (req, res) => {
     }
 
     // Check if permission exists
-    const existing = await db
+    const [existing] = await db
       .select()
       .from(userPermission)
       .where(eq(userPermission.id, id));
 
-    if (!existing || existing.length === 0) {
+    if (!existing) {
       return errorResponse(res, "User permission not found", 404);
     }
 
-    // Update specific permission
-    const updateData = {
-      [permission]: value,
-      updatedAt: new Date(),
-    };
+
 
     await db
       .update(userPermission)
-      .set(updateData)
+      .set({[permission]:value})
       .where(eq(userPermission.id, id));
 
     // Fetch updated record
-    const updated = await db
+    const [updated] = await db
       .select()
       .from(userPermission)
       .where(eq(userPermission.id, id));
 
     return successResponse(
       res,
-      updated[0],
+      updated,
       `User ${permission} permission ${value ? 'enabled' : 'disabled'} successfully`,
       200
     );

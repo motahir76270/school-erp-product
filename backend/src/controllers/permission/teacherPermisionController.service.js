@@ -1,5 +1,5 @@
 // src/controllers/teacherPermissionController.js
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or, sql, like, inArray } from "drizzle-orm";
 import { db } from "../../db/db.js";
 import { teacherPermission,teachers } from "../../db/schema/users.js";
 import { errorResponse, successResponse } from "../../lib/response.js";
@@ -14,21 +14,52 @@ export const getAllTeacherPermissions = async (req, res) => {
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    const whereConditions = [];
+    // Step 1: Get all unique teacher IDs having permissions
+    const permissionTeachers = await db
+      .selectDistinct({
+        teacherId: teacherPermission.teacherId,
+      })
+      .from(teacherPermission);
 
+    const teacherIds = permissionTeachers.map((item) => item.teacherId);
+
+    // No permission records
+    if (teacherIds.length === 0) {
+      return successResponse(
+        res,
+        {
+          teachers: [],
+          pagination: {
+            currentPage: pageNum,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: limitNum,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        },
+        "Teacher permissions fetched successfully",
+        200
+      );
+    }
+
+    const whereConditions = [
+      inArray(teachers.id, teacherIds),
+    ];
+
+    // Search
     if (search) {
       whereConditions.push(
         or(
-          ilike(teachers.name, `%${search}%`),
-          ilike(teachers.email, `%${search}%`)
+          like(teachers.name, `%${search}%`),
+          like(teachers.email, `%${search}%`)
         )
       );
     }
 
-    const whereClause =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    const whereClause = and(...whereConditions);
 
-    // Total teachers
+    // Total count
     const totalResult = await db
       .select({ count: sql`count(*)` })
       .from(teachers)
@@ -36,11 +67,11 @@ export const getAllTeacherPermissions = async (req, res) => {
 
     const totalCount = Number(totalResult[0]?.count ?? 0);
 
-    // Teachers with permissions
+    // Fetch teachers with permissions
     const teacherData = await db.query.teachers.findMany({
       where: whereClause,
       with: {
-        teacherPermission: true,
+        permission: true,
       },
       limit: limitNum,
       offset,
@@ -112,7 +143,8 @@ export const createTeacherPermission = async (req, res) => {
       attendance, 
       subject, 
       classes, 
-      exam 
+      exam ,
+      fee
     } = req.body;
 
     // Validate required fields
@@ -152,6 +184,7 @@ export const createTeacherPermission = async (req, res) => {
       subject: subject !== undefined ? subject : false,
       classes: classes !== undefined ? classes : false,
       exam: exam !== undefined ? exam : false,
+      fee: fee !== undefined ? fee : false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -178,15 +211,15 @@ export const createTeacherPermission = async (req, res) => {
 export const updateTeacherPermission = async (req, res) => {
   try {
     const { id } = req.params;
-    const { attendance, subject, classes, exam } = req.body;
+    const { attendance, subject, classes, exam ,fee} = req.body;
 
     // Check if permission exists
-    const existing = await db
+    const [existing] = await db
       .select()
       .from(teacherPermission)
       .where(eq(teacherPermission.id, id));
 
-    if (!existing || existing.length === 0) {
+    if (!existing) {
       return errorResponse(res, "Teacher permission not found", 404);
     }
 
@@ -199,6 +232,8 @@ export const updateTeacherPermission = async (req, res) => {
     if (subject !== undefined) updateData.subject = subject;
     if (classes !== undefined) updateData.classes = classes;
     if (exam !== undefined) updateData.exam = exam;
+    if (fee !== undefined) updateData.fee = fee;
+
 
     // Update permission
     await db
@@ -207,14 +242,14 @@ export const updateTeacherPermission = async (req, res) => {
       .where(eq(teacherPermission.id, id));
 
     // Fetch updated record
-    const updated = await db
+    const [updated] = await db
       .select()
       .from(teacherPermission)
       .where(eq(teacherPermission.id, id));
 
     return successResponse(
       res,
-      updated[0],
+      updated,
       "Teacher permission updated successfully",
       200
     );
@@ -234,7 +269,7 @@ export const updateTeacherPermissionStatus = async (req, res) => {
     const { id } = req.params;
     const { permission, value } = req.body;
 
-    const validPermissions = ['attendance', 'subject', 'classes', 'exam'];
+    const validPermissions = ['attendance', 'subject', 'classes', 'exam' , 'fee'];
     
     if (!permission || !validPermissions.includes(permission)) {
       return errorResponse(

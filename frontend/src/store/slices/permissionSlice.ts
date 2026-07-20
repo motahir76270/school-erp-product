@@ -1,4 +1,3 @@
-// store/slices/permissionSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 
@@ -31,9 +30,12 @@ export interface UserWithPermission {
   role: string;
   profileImage: string | null;
   isActive: boolean;
+  phone: string | null;
+  address: string | null;
   userPermission: UserPermission | null;
   createdAt: string;
   updatedAt: string;
+  lastLoginAt: string | null;
 }
 
 // Teacher Permission Types
@@ -45,6 +47,7 @@ export interface TeacherPermission {
   subject: boolean;
   classes: boolean;
   exam: boolean;
+  fee: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,7 +92,7 @@ export interface ApiResponse<T = any> {
 
 // Permission Keys
 export type UserPermissionKey = 'attendance' | 'subject' | 'classes' | 'exam' | 'fee' | 'users' | 'students' | 'teachers';
-export type TeacherPermissionKey = 'attendance' | 'subject' | 'classes' | 'exam';
+export type TeacherPermissionKey = 'attendance' | 'subject' | 'classes' | 'exam' | 'fee';
 
 // ==================== Initial State ====================
 
@@ -270,9 +273,9 @@ export const getAllUserPermissionsApiCall = async (
     page?: number;
     limit?: number;
   } = {}
-): Promise<ApiResponse<UserPermissionResponse>> => {
+) => {
   try {
-    const response = await axios.get<ApiResponse<UserPermissionResponse>>(
+    const response = await axios.get(
       `${API_BASE_URL}/user`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -293,9 +296,9 @@ export const getAllUserPermissionsApiCall = async (
 export const getUserPermissionByIdApiCall = async (
   token: string,
   id: string
-): Promise<ApiResponse<UserPermission>> => {
+) => {
   try {
-    const response = await axios.get<ApiResponse<UserPermission>>(
+    const response = await axios.get(
       `${API_BASE_URL}/user/${id}`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -325,9 +328,9 @@ export const createUserPermissionApiCall = async (
     students?: boolean;
     teachers?: boolean;
   }
-): Promise<ApiResponse<UserPermission>> => {
+) => {
   try {
-    const response = await axios.post<ApiResponse<UserPermission>>(
+    const response = await axios.post(
       `${API_BASE_URL}/user`,
       data,
       {
@@ -358,9 +361,9 @@ export const updateUserPermissionApiCall = async (
     students?: boolean;
     teachers?: boolean;
   }
-): Promise<ApiResponse<UserPermission>> => {
+) => {
   try {
-    const response = await axios.put<ApiResponse<UserPermission>>(
+    const response = await axios.put(
       `${API_BASE_URL}/user/${id}`,
       data,
       {
@@ -385,10 +388,10 @@ export const updateUserPermissionStatusApiCall = async (
     permission: UserPermissionKey;
     value: boolean;
   }
-): Promise<ApiResponse<UserPermission>> => {
+) => {
   try {
-    const response = await axios.patch<ApiResponse<UserPermission>>(
-      `${API_BASE_URL}/user/${id}/status`,
+    const response = await axios.patch(
+      `${API_BASE_URL}/user/status/${id}`,
       data,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -408,9 +411,9 @@ export const updateUserPermissionStatusApiCall = async (
 export const deleteUserPermissionApiCall = async (
   token: string,
   id: string
-): Promise<ApiResponse<null>> => {
+) => {
   try {
-    const response = await axios.delete<ApiResponse<null>>(
+    const response = await axios.delete(
       `${API_BASE_URL}/user/${id}`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -442,15 +445,9 @@ export const bulkCreateUserPermissionsApiCall = async (
       teachers?: boolean;
     }>;
   }
-): Promise<ApiResponse<{
-  created: UserPermission[];
-  errors: any[];
-  total: number;
-  successCount: number;
-  errorCount: number;
-}>> => {
+) => {
   try {
-    const response = await axios.post<ApiResponse<any>>(
+    const response = await axios.post(
       `${API_BASE_URL}/user/bulk`,
       data,
       {
@@ -477,9 +474,9 @@ export const getAllTeacherPermissionsApiCall = async (
     page?: number;
     limit?: number;
   } = {}
-): Promise<ApiResponse<TeacherPermissionResponse>> => {
+) => {
   try {
-    const response = await axios.get<ApiResponse<TeacherPermissionResponse>>(
+    const response = await axios.get(
       `${API_BASE_URL}/teacher`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -500,9 +497,9 @@ export const getAllTeacherPermissionsApiCall = async (
 export const getTeacherPermissionByIdApiCall = async (
   token: string,
   id: string
-): Promise<ApiResponse<TeacherPermission>> => {
+) => {
   try {
-    const response = await axios.get<ApiResponse<TeacherPermission>>(
+    const response = await axios.get(
       `${API_BASE_URL}/teacher/${id}`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -528,10 +525,12 @@ export const createTeacherPermissionApiCall = async (
     subject?: boolean;
     classes?: boolean;
     exam?: boolean;
+    fee?: boolean;
+
   }
-): Promise<ApiResponse<TeacherPermission>> => {
+) => {
   try {
-    const response = await axios.post<ApiResponse<TeacherPermission>>(
+    const response = await axios.post(
       `${API_BASE_URL}/teacher`,
       data,
       {
@@ -557,10 +556,11 @@ export const updateTeacherPermissionApiCall = async (
     subject?: boolean;
     classes?: boolean;
     exam?: boolean;
+    fee?: boolean;
   }
-): Promise<ApiResponse<TeacherPermission>> => {
+) => {
   try {
-    const response = await axios.put<ApiResponse<TeacherPermission>>(
+    const response = await axios.put(
       `${API_BASE_URL}/teacher/${id}`,
       data,
       {
@@ -585,10 +585,10 @@ export const updateTeacherPermissionStatusApiCall = async (
     permission: TeacherPermissionKey;
     value: boolean;
   }
-): Promise<ApiResponse<TeacherPermission>> => {
+) => {
   try {
-    const response = await axios.patch<ApiResponse<TeacherPermission>>(
-      `${API_BASE_URL}/teacher/${id}/status`,
+    const response = await axios.patch(
+      `${API_BASE_URL}/teacher/status/${id}`,
       data,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -608,9 +608,9 @@ export const updateTeacherPermissionStatusApiCall = async (
 export const deleteTeacherPermissionApiCall = async (
   token: string,
   id: string
-): Promise<ApiResponse<null>> => {
+) => {
   try {
-    const response = await axios.delete<ApiResponse<null>>(
+    const response = await axios.delete(
       `${API_BASE_URL}/teacher/${id}`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -637,17 +637,12 @@ export const bulkCreateTeacherPermissionsApiCall = async (
       subject?: boolean;
       classes?: boolean;
       exam?: boolean;
+      fee?: boolean;
     }>;
   }
-): Promise<ApiResponse<{
-  created: TeacherPermission[];
-  errors: any[];
-  total: number;
-  successCount: number;
-  errorCount: number;
-}>> => {
+) => {
   try {
-    const response = await axios.post<ApiResponse<any>>(
+    const response = await axios.post(
       `${API_BASE_URL}/teacher/bulk`,
       data,
       {

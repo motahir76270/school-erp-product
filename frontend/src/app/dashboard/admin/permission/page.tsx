@@ -1,4 +1,3 @@
-// app/dashboard/admin/settings/permission/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -12,9 +11,6 @@ import {
   setUserPermissions,
   setLoading,
   setError,
-  updateUserPermissionStatus,
-  removeUserPermission,
-  addUserPermission,
 } from '@/store/slices/permissionSlice';
 import { getAllUsersApiCall, setUsers } from '@/store/slices/userSlice';
 import { PageHeader } from '@/components/layout/page-header';
@@ -60,6 +56,7 @@ import {
   UserPlus,
   Trash2,
   Plus,
+  X,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -98,20 +95,35 @@ interface UserPermission {
   updatedAt: string;
 }
 
-interface UserWithPermission extends User {
+interface UserWithPermission {
+  id: string;
+  userId: string | null;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  profileImage: string | null;
+  isActive: boolean;
+  phone: string | null;
+  address: string | null;
   userPermission: UserPermission | null;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string | null;
 }
 
 export default function PermissionPage() {
   const dispatch = useAppDispatch();
   const { userPermissions, loading: permissionLoading } = useAppSelector((state: any) => state.permission);
   const { users, loading: userLoading } = useAppSelector((state: any) => state.user);
-  
+
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Bulk assign state
   const [bulkPermissions, setBulkPermissions] = useState<{
     [key: string]: boolean;
   }>({
@@ -124,7 +136,8 @@ export default function PermissionPage() {
     students: false,
     teachers: false,
   });
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [bulkSelectedUsers, setBulkSelectedUsers] = useState<string[]>([]);
+  const [bulkUserSearch, setBulkUserSearch] = useState('');
   
   // Create permission form
   const [createForm, setCreateForm] = useState({
@@ -138,6 +151,7 @@ export default function PermissionPage() {
     students: false,
     teachers: false,
   });
+  const [createUserSearch, setCreateUserSearch] = useState('');
 
   // Permission labels for display
   const permissionLabels: Record<string, string> = {
@@ -150,6 +164,8 @@ export default function PermissionPage() {
     students: 'Students',
     teachers: 'Teachers',
   };
+
+  const permissionKeys = ['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'];
 
   // Fetch Users for dropdown
   const fetchUsers = async () => {
@@ -177,7 +193,7 @@ export default function PermissionPage() {
     }
   };
 
-  // Fetch User Permissions - This API returns users with their permissions
+  // Fetch User Permissions
   const fetchPermissions = async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -187,20 +203,46 @@ export default function PermissionPage() {
 
     dispatch(setLoading(true));
     try {
-      const data = await getAllUserPermissionsApiCall(token, {
+      const response = await getAllUserPermissionsApiCall(token, {
         page: page,
         search: search || undefined,
         limit: 10,
       });
 
-      console.log('Permissions API Response:', data);
+      if (response?.success) {
+        let usersData: UserWithPermission[] = [];
+        let paginationData = {
+          currentPage: 1,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: 10,
+          hasNextPage: false,
+          hasPrevPage: false,
+        };
 
-      if (data?.success) {
-        // The API returns users with their permissions
-        dispatch(setUserPermissions(data.data));
+        if (response.data?.users) {
+          usersData = response.data.users;
+          paginationData = response.data.pagination || paginationData;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          usersData = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          usersData = response.data;
+        }
+
+        const formattedUsers = usersData.map((user: any) => ({
+          ...user,
+          userPermission: user.userPermission && Array.isArray(user.userPermission) && user.userPermission.length > 0
+            ? user.userPermission[0]
+            : null
+        }));
+
+        dispatch(setUserPermissions({
+          users: formattedUsers,
+          pagination: paginationData
+        }));
       } else {
-        toast.error(data?.message || 'Failed to fetch permissions');
-        dispatch(setError(data?.message || 'Failed to fetch permissions'));
+        toast.error(response?.message || 'Failed to fetch permissions');
+        dispatch(setError(response?.message || 'Failed to fetch permissions'));
       }
     } catch (error: any) {
       console.error('Fetch permissions error:', error);
@@ -211,8 +253,7 @@ export default function PermissionPage() {
     }
   };
 
-  // Get users with permissions from the API response
-  const usersWithPermissions: UserWithPermission[] = userPermissions?.users || [];
+  const usersWithPermissions: UserWithPermission[] = userPermissions || [];
 
   useEffect(() => {
     fetchPermissions();
@@ -222,7 +263,7 @@ export default function PermissionPage() {
   // Handle toggle single permission
   const handleTogglePermission = async (
     userId: string,
-    permission: string,
+    permissionKey: string,
     currentValue: boolean
   ) => {
     const token = localStorage.getItem('accessToken');
@@ -231,16 +272,14 @@ export default function PermissionPage() {
       return;
     }
 
-    // Find existing permission for this user
-    const user = usersWithPermissions.find((u: UserWithPermission) => u.id === userId);
+    const user = usersWithPermissions.find((u: any) => u.id === userId);
     const existingPermission = user?.userPermission || null;
-
+    
     setIsSubmitting(true);
     try {
       if (existingPermission) {
-        // Update existing permission
         const data = await updateUserPermissionStatusApiCall(token, existingPermission.id, {
-          permission: permission as any,
+          permission: permissionKey as any,
           value: !currentValue,
         });
 
@@ -251,18 +290,18 @@ export default function PermissionPage() {
           toast.error(data?.message || 'Failed to update permission');
         }
       } else {
-        // Create new permission for user
-        const newPermission = {
+        const newPermission: any = {
           userId,
-          attendance: permission === 'attendance' ? !currentValue : false,
-          subject: permission === 'subject' ? !currentValue : false,
-          classes: permission === 'classes' ? !currentValue : false,
-          exam: permission === 'exam' ? !currentValue : false,
-          fee: permission === 'fee' ? !currentValue : false,
-          users: permission === 'users' ? !currentValue : false,
-          students: permission === 'students' ? !currentValue : false,
-          teachers: permission === 'teachers' ? !currentValue : false,
+          attendance: false,
+          subject: false,
+          classes: false,
+          exam: false,
+          fee: false,
+          users: false,
+          students: false,
+          teachers: false,
         };
+        newPermission[permissionKey] = true;
 
         const data = await createUserPermissionApiCall(token, newPermission);
         if (data?.success) {
@@ -323,6 +362,7 @@ export default function PermissionPage() {
           students: false,
           teachers: false,
         });
+        setCreateUserSearch('');
         await fetchPermissions();
       } else {
         toast.error(data?.message || 'Failed to create permission');
@@ -337,7 +377,7 @@ export default function PermissionPage() {
 
   // Handle bulk create permissions
   const handleBulkCreatePermissions = async () => {
-    if (selectedUsers.length === 0) {
+    if (bulkSelectedUsers.length === 0) {
       toast.error('Please select at least one user');
       return;
     }
@@ -350,7 +390,7 @@ export default function PermissionPage() {
 
     setIsSubmitting(true);
     try {
-      const permissions = selectedUsers.map(userId => ({
+      const permissions = bulkSelectedUsers.map(userId => ({
         userId,
         attendance: bulkPermissions.attendance,
         subject: bulkPermissions.subject,
@@ -367,7 +407,8 @@ export default function PermissionPage() {
       if (data?.success) {
         toast.success(data?.message || 'Permissions created successfully');
         setIsBulkModalOpen(false);
-        setSelectedUsers([]);
+        setBulkSelectedUsers([]);
+        setBulkUserSearch('');
         setBulkPermissions({
           attendance: false,
           subject: false,
@@ -414,15 +455,6 @@ export default function PermissionPage() {
     }
   };
 
-  // Toggle user selection for bulk
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers(prev =>
-      prev.includes(userId)
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
@@ -432,51 +464,122 @@ export default function PermissionPage() {
   // Get permission count
   const getPermissionCount = (permission: UserPermission | null) => {
     if (!permission) return 0;
-    const keys = ['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'];
-    return keys.filter(key => permission[key as keyof UserPermission] === true).length;
+    return permissionKeys.filter(key => permission[key as keyof UserPermission] === true).length;
   };
 
   // Check if all permissions are enabled
   const areAllPermissionsEnabled = (permission: UserPermission | null) => {
     if (!permission) return false;
-    const keys = ['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'];
-    return keys.every(key => permission[key as keyof UserPermission] === true);
+    return permissionKeys.every(key => permission[key as keyof UserPermission] === true);
+  };
+
+  // Check if any permission is enabled
+  const hasAnyPermission = (permission: UserPermission | null) => {
+    if (!permission) return false;
+    return permissionKeys.some(key => permission[key as keyof UserPermission] === true);
   };
 
   const loading = permissionLoading || userLoading;
+
+  // Handle toggle all permissions for bulk
+  const handleToggleAllBulkPermissions = () => {
+    const allEnabled = Object.values(bulkPermissions).every(v => v === true);
+    const newState = Object.keys(bulkPermissions).reduce((acc, key) => {
+      acc[key] = !allEnabled;
+      return acc;
+    }, {} as { [key: string]: boolean });
+    setBulkPermissions(newState);
+  };
+
+  // Get filtered users for create dropdown with search
+  const getFilteredUsersForCreate = () => {
+    if (!users) return [];
+    
+    if (createUserSearch) {
+      const searchLower = createUserSearch.toLowerCase();
+      return users.filter((user: any) => 
+        user.firstName?.toLowerCase().includes(searchLower) ||
+        user.lastName?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchLower)
+      );
+    }
+    return users;
+  };
+
+  // Get filtered users for bulk dropdown with search
+  const getFilteredUsersForBulk = () => {
+    if (!users) return [];
+    
+    // Filter out already selected users
+    const availableUsers = users.filter((user: any) => !bulkSelectedUsers.includes(user.id));
+    
+    if (bulkUserSearch) {
+      const searchLower = bulkUserSearch.toLowerCase();
+      return availableUsers.filter((user: any) => 
+        user.firstName?.toLowerCase().includes(searchLower) ||
+        user.lastName?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return availableUsers;
+  };
+
+  // Handle add user to bulk selection
+  const handleAddUserToBulk = (userId: string) => {
+    if (!bulkSelectedUsers.includes(userId)) {
+      setBulkSelectedUsers([...bulkSelectedUsers, userId]);
+      setBulkUserSearch('');
+    }
+  };
+
+  // Handle remove user from bulk selection
+  const handleRemoveUserFromBulk = (userId: string) => {
+    setBulkSelectedUsers(bulkSelectedUsers.filter(id => id !== userId));
+  };
+
+  // Get user details by ID
+  const getUserById = (userId: string) => {
+    return users?.find((user: any) => user.id === userId);
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="User Permissions" 
         description="Manage user permissions and access control"
-      >
-      </PageHeader>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => {
-              fetchPermissions();
-              fetchUsers();
-            }} 
-            disabled={loading}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Permission
-          </Button>
-          <Button size="sm" onClick={() => setIsBulkModalOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Bulk Assign
-          </Button>
-        </div>
+      />
+
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => {
+            fetchPermissions();
+            fetchUsers();
+          }} 
+          disabled={loading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+        <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Permission
+        </Button>
+        <Button size="sm" onClick={() => {
+          setBulkSelectedUsers([]);
+          setIsBulkModalOpen(true);
+        }}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Bulk Assign
+        </Button>
+      </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -496,7 +599,7 @@ export default function PermissionPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">With Permissions</p>
                 <p className="text-2xl font-bold">
-                  {usersWithPermissions.filter(u => u.userPermission).length}
+                  {usersWithPermissions.filter((u: any) => u.userPermission && hasAnyPermission(u.userPermission)).length}
                 </p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -511,26 +614,11 @@ export default function PermissionPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Users</p>
                 <p className="text-2xl font-bold">
-                  {usersWithPermissions.filter(u => u.isActive).length}
+                  {usersWithPermissions.filter((u: any) => u.isActive).length}
                 </p>
               </div>
               <div className="p-3 bg-emerald-100 rounded-full">
                 <CheckCircle className="h-6 w-6 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Permissions</p>
-                <p className="text-2xl font-bold">
-                  {usersWithPermissions.reduce((acc, u) => acc + getPermissionCount(u.userPermission), 0)}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <UserCog className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -568,64 +656,37 @@ export default function PermissionPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">
-                    <input
-                      type="checkbox"
-                      checked={selectedUsers.length === usersWithPermissions.length && usersWithPermissions.length > 0}
-                      onChange={() => {
-                        if (selectedUsers.length === usersWithPermissions.length) {
-                          setSelectedUsers([]);
-                        } else {
-                          setSelectedUsers(usersWithPermissions.map(u => u.id));
-                        }
-                      }}
-                      className="rounded border-gray-300"
-                    />
-                  </TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Attendance</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Classes</TableHead>
-                  <TableHead>Exam</TableHead>
-                  <TableHead>Fee</TableHead>
-                  <TableHead>Users</TableHead>
-                  <TableHead>Students</TableHead>
-                  <TableHead>Teachers</TableHead>
+                  {permissionKeys.map((perm) => (
+                    <TableHead key={perm} className="text-center">
+                      {permissionLabels[perm]}
+                    </TableHead>
+                  ))}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={permissionKeys.length + 3} className="text-center py-8 text-muted-foreground">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                       Loading permissions...
                     </TableCell>
                   </TableRow>
                 ) : usersWithPermissions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={permissionKeys.length + 3} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  usersWithPermissions.map((user) => {
+                  usersWithPermissions.map((user: any) => {
                     const permission = user.userPermission;
-                    const hasPermission = !!permission;
+                    const hasPermission = !!permission && hasAnyPermission(permission);
                     
                     return (
                       <TableRow key={user.id}>
-                        {/* Checkbox */}
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedUsers.includes(user.id)}
-                            onChange={() => toggleUserSelection(user.id)}
-                            className="rounded border-gray-300"
-                          />
-                        </TableCell>
-
                         {/* User Info */}
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -657,8 +718,8 @@ export default function PermissionPage() {
                         </TableCell>
 
                         {/* Permission Switches */}
-                        {['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'].map((perm) => (
-                          <TableCell key={perm}>
+                        {permissionKeys.map((perm) => (
+                          <TableCell key={perm} className="text-center">
                             <Switch
                               checked={hasPermission ? permission[perm as keyof UserPermission] || false : false}
                               onCheckedChange={() => 
@@ -686,14 +747,12 @@ export default function PermissionPage() {
                                 <>
                                   <DropdownMenuItem>
                                     <span className="text-xs text-muted-foreground">
-                                      {getPermissionCount(permission)} of 8 permissions
+                                      {getPermissionCount(permission)} of {permissionKeys.length} permissions
                                     </span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      const allEnabled = areAllPermissionsEnabled(permission);
-                                      const keys = ['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'];
-                                      keys.forEach((p) => {
+                                      permissionKeys.forEach((p) => {
                                         handleTogglePermission(
                                           user.id,
                                           p,
@@ -743,38 +802,62 @@ export default function PermissionPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreatePermission} className="space-y-4">
-            {/* User Selection */}
+            {/* User Selection with Search */}
             <div className="space-y-2">
               <Label>Select User <span className="text-red-500">*</span></Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search users by name or email..."
+                  value={createUserSearch}
+                  onChange={(e) => setCreateUserSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               <Select
                 value={createForm.userId}
-                onValueChange={(value) => setCreateForm({ ...createForm, userId: value })}
+                onValueChange={(value) => {
+                  setCreateForm({ ...createForm, userId: value });
+                  setCreateUserSearch('');
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a user" />
                 </SelectTrigger>
-                <SelectContent>
-                  {users.map((user: User) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={user.profileImage ? `${baseURl}/${user.profileImage}` : undefined} />
-                          <AvatarFallback className="text-xs">
-                            {getInitials(user.firstName, user.lastName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{user.firstName} {user.lastName}</span>
-                        <span className="text-xs text-muted-foreground">({user.email})</span>
-                      </div>
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-[300px]">
+                  {getFilteredUsersForCreate().length === 0 ? (
+                    <div className="p-4 text-sm text-center text-muted-foreground">
+                      {createUserSearch ? 'No users found matching your search' : 'No users available'}
+                    </div>
+                  ) : (
+                    getFilteredUsersForCreate().map((user: any) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={user.profileImage ? `${baseURl}/${user.profileImage}` : undefined} />
+                            <AvatarFallback className="text-xs">
+                              {getInitials(user.firstName, user.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">
+                              {user.firstName} {user.lastName}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {user.email}
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             {/* Permission Toggles */}
             <div className="grid grid-cols-2 gap-4">
-              {['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'].map((perm) => (
+              {permissionKeys.map((perm) => (
                 <div key={perm} className="flex items-center justify-between p-2 border rounded-lg">
                   <Label className="capitalize">{permissionLabels[perm]}</Label>
                   <Switch
@@ -805,11 +888,16 @@ export default function PermissionPage() {
                     students: false,
                     teachers: false,
                   });
+                  setCreateUserSearch('');
                 }}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              <Button 
+                type="submit" 
+                className="flex-1" 
+                disabled={isSubmitting || !createForm.userId}
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -829,55 +917,121 @@ export default function PermissionPage() {
 
       {/* Bulk Assign Permissions Modal */}
       <Dialog open={isBulkModalOpen} onOpenChange={setIsBulkModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
             <DialogTitle>Bulk Assign Permissions</DialogTitle>
             <DialogDescription>
-              Select permissions to assign to selected users
+              Select multiple users and assign permissions to all of them
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* User Selection with Search */}
+            <div className="space-y-2">
+              <Label>Select Users</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search users by name or email..."
+                  value={bulkUserSearch}
+                  onChange={(e) => setBulkUserSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* Selected Users Tags */}
+              {bulkSelectedUsers.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-2 border rounded-lg">
+                  {bulkSelectedUsers.map((userId) => {
+                    const user = getUserById(userId);
+                    return user ? (
+                      <div key={userId} className="flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-sm">
+                        <Avatar className="h-5 w-5">
+                          <AvatarFallback className="text-[10px]">
+                            {getInitials(user.firstName, user.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{user.firstName} {user.lastName}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUserFromBulk(userId)}
+                          className="hover:text-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              {/* User List */}
+              <div className="border rounded-lg max-h-[200px] overflow-y-auto">
+                {getFilteredUsersForBulk().length === 0 ? (
+                  <div className="p-4 text-sm text-center text-muted-foreground">
+                    {bulkUserSearch ? 'No users found matching your search' : 'No users available'}
+                  </div>
+                ) : (
+                  getFilteredUsersForBulk().map((user: any) => (
+                    <div
+                      key={user.id}
+                      onClick={() => handleAddUserToBulk(user.id)}
+                      className="flex items-center gap-3 p-3 hover:bg-muted cursor-pointer border-b last:border-b-0 transition-colors"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.profileImage ? `${baseURl}/${user.profileImage}` : undefined} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(user.firstName, user.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          {user.firstName} {user.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {user.email}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{user.role?.replace('_', ' ').toUpperCase()}</Badge>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             {/* Selected Users Count */}
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm font-medium">
-                Selected Users: {selectedUsers.length}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {selectedUsers.length === 0 ? 'Please select users from the table above' : 'Click to assign permissions to selected users'}
+                Selected Users: <span className="text-primary">{bulkSelectedUsers.length}</span>
               </p>
             </div>
 
             {/* Permission Toggles */}
-            <div className="grid grid-cols-2 gap-4">
-              {['attendance', 'subject', 'classes', 'exam', 'fee', 'users', 'students', 'teachers'].map((perm) => (
-                <div key={perm} className="flex items-center justify-between p-2 border rounded-lg">
-                  <Label className="capitalize">{permissionLabels[perm]}</Label>
-                  <Switch
-                    checked={bulkPermissions[perm] || false}
-                    onCheckedChange={(checked) => 
-                      setBulkPermissions(prev => ({ ...prev, [perm]: checked }))
-                    }
-                  />
-                </div>
-              ))}
-            </div>
+            <div className="space-y-2">
+              <Label>Permissions to Assign</Label>
+              <div className="grid grid-cols-2 gap-4">
+                {permissionKeys.map((perm) => (
+                  <div key={perm} className="flex items-center justify-between p-2 border rounded-lg">
+                    <Label className="capitalize">{permissionLabels[perm]}</Label>
+                    <Switch
+                      checked={bulkPermissions[perm] || false}
+                      onCheckedChange={(checked) => 
+                        setBulkPermissions(prev => ({ ...prev, [perm]: checked }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
 
-            {/* Quick Select All */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                const allEnabled = Object.values(bulkPermissions).every(v => v === true);
-                const newState = Object.keys(bulkPermissions).reduce((acc, key) => {
-                  acc[key] = !allEnabled;
-                  return acc;
-                }, {} as { [key: string]: boolean });
-                setBulkPermissions(newState);
-              }}
-            >
-              {Object.values(bulkPermissions).every(v => v === true) ? 'Deselect All' : 'Select All'}
-            </Button>
+              {/* Quick Select All */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={handleToggleAllBulkPermissions}
+              >
+                {Object.values(bulkPermissions).every(v => v === true) ? 'Deselect All' : 'Select All'}
+              </Button>
+            </div>
 
             <div className="flex gap-3 pt-4 border-t">
               <Button
@@ -886,7 +1040,8 @@ export default function PermissionPage() {
                 className="flex-1"
                 onClick={() => {
                   setIsBulkModalOpen(false);
-                  setSelectedUsers([]);
+                  setBulkSelectedUsers([]);
+                  setBulkUserSearch('');
                   setBulkPermissions({
                     attendance: false,
                     subject: false,
@@ -904,7 +1059,7 @@ export default function PermissionPage() {
               <Button 
                 className="flex-1" 
                 onClick={handleBulkCreatePermissions}
-                disabled={isSubmitting || selectedUsers.length === 0}
+                disabled={isSubmitting || bulkSelectedUsers.length === 0}
               >
                 {isSubmitting ? (
                   <>
@@ -914,7 +1069,7 @@ export default function PermissionPage() {
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Assign Permissions
+                    Assign to {bulkSelectedUsers.length} User{bulkSelectedUsers.length > 1 ? 's' : ''}
                   </>
                 )}
               </Button>

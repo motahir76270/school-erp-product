@@ -523,8 +523,8 @@ export const teacherPermission = mysqlTable("teacher_permission", {
   attendance: boolean("attendance").default(false),
   subject: boolean("subject").default(false),
   classes: boolean("classes").default(false),
+  fee: boolean("fee").default(false),
   exam: boolean("exam").default(false),
-  attendance: boolean("attendance").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });

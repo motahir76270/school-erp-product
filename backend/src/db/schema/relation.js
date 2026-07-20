@@ -112,10 +112,7 @@ export const teachersRelations = relations(teachers, ({ one, many }) => ({
   assignments: many(assignments),
   bookIssues: many(bookIssues),
   salaries: many(teacherSalaries),
-  permission: many(teacherPermission, {
-    fields: [teachers.id],
-    references: [teacherPermission.teacherId],
-  }),
+  permission: many(teacherPermission),
 }));
 
 // Class relations - Removed classTeacher relation

@@ -190,6 +190,13 @@
       "when": 1784541941526,
       "tag": "0026_mixed_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1784573077839,
+      "tag": "0027_yellow_penance",
+      "breakpoints": true
     }
   ]
 }
