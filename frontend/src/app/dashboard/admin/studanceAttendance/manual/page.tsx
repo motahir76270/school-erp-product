@@ -26,7 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Search, Save, User, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { markAttendanceApiCall, getAttendanceByDateApiCall } from '@/store/slices/attendanceSlice';
+import { markAttendanceApiCall, getAttendanceByDateApiCall } from '@/src/store/slices/attandance/studanceAttendanceSlice';
 import { getAllClassWithSections } from '@/store/slices/classSlice';
 import { getAllStudentsApiCall } from '@/store/slices/studentSlice';
 import { format } from 'date-fns';

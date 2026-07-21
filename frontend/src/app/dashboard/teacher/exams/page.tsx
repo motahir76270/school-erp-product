@@ -9,7 +9,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchStudents } from '@/store/slices/studentSlice';
 import { fetchTeachers } from '@/store/slices/teacherSlice';
 import { fetchClasses, fetchSections, fetchSubjects } from '@/store/slices/classSlice';
-import { fetchAttendanceStats } from '@/store/slices/attendanceSlice';
+import { fetchAttendanceStats } from '@/src/store/slices/attandance/studanceAttendanceSlice';
 import { fetchFees, fetchFeeStats, fetchPayments } from '@/store/slices/feeSlice';
 import { fetchExams } from '@/store/slices/examSlice';
 import { fetchMcqTests } from '@/store/slices/mcqSlice';

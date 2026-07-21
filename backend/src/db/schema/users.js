@@ -120,7 +120,7 @@ export const classSubjects = mysqlTable("class_subjects", {
 });
 
 // Attendance Table
-export const attendance = mysqlTable("attendance", {
+export const studentAttendance = mysqlTable("student_attendance", {
   id: varchar("id", { length: 36 }).primaryKey(),
   date: date("date").notNull(),
   classId: varchar("class_id", { length: 36 }).notNull(),
@@ -131,11 +131,33 @@ export const attendance = mysqlTable("attendance", {
 });
 
 // Attendance Logs Table
-export const attendanceLogs = mysqlTable("attendance_logs", {
+export const studentAttendanceLogs = mysqlTable("student_attendance_logs", {
   id: varchar("id", { length: 36 }).primaryKey(),
   attendanceId: varchar("attendance_id", { length: 36 }).notNull(),
   studentId: varchar("student_id", { length: 36 }).notNull(),
   status: varchar("status", { length: 20 }).notNull(), // present, absent, late, leave
+  markedAt: timestamp("marked_at").defaultNow(),
+});
+
+// Teacher Attendance Table
+export const teacherAttendance = mysqlTable("teacher_attendance", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  date: date("date").notNull(),
+  markedBy: varchar("marked_by", { length: 36 }).notNull(), // Admin
+  markingMethod: varchar("marking_method", { length: 20 }).default("manual"), //qrcode scan through
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Teacher Attendance Logs Table
+export const teacherAttendanceLogs = mysqlTable("teacher_attendance_logs", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+
+  attendanceId: varchar("attendance_id", { length: 36 }).notNull(),
+
+  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
+
+  status: varchar("status", { length: 20 }).notNull(), // present, absent, late, leave
+
   markedAt: timestamp("marked_at").defaultNow(),
 });
 

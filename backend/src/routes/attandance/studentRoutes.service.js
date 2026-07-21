@@ -8,17 +8,17 @@
     updateAttendanceStatus,
     getAttendanceSummary,
     deleteAttendance,
-  } from "../controllers/attendanceController.service.js";
+  } from "../../controllers/attendance/studentAttendanceController.service.js";
   import {
     authMiddleware,
     roleMiddleware,
-  } from "../middleware/authMiddleware.js";
+  } from "../../middleware/authMiddleware.js";
 
   const attendanceRouter = Router();
 
   // ==================== MARK ATTENDANCE ====================
   attendanceRouter.post(
-    "/mark",
+    "/student/mark",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     markAttendance,
@@ -26,7 +26,7 @@
 
   // ==================== MARK ATTENDANCE VIA QR ====================
   attendanceRouter.post(
-    "/mark-qr",
+    "/student/mark-qr",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     markAttendanceViaQR,
@@ -34,7 +34,7 @@
 
   // ==================== GET ATTENDANCE BY DATE ====================
   attendanceRouter.get(
-    "/date",
+    "/student/date",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     getAttendanceByDate,
@@ -42,7 +42,7 @@
 
   // ==================== GET STUDENT ATTENDANCE ====================
   attendanceRouter.get(
-    "/student/:studentId",
+    "/student/attendance/:studentId",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     getStudentAttendance,
@@ -50,7 +50,7 @@
 
   // ==================== GET ATTENDANCE SUMMARY ====================
   attendanceRouter.get(
-    "/summary",
+    "/student/summary",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     getAttendanceSummary,
@@ -58,7 +58,7 @@
 
   // ==================== UPDATE ATTENDANCE STATUS ====================
   attendanceRouter.put(
-    "/log/:logId",
+    "/student/log/:logId",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     updateAttendanceStatus,
@@ -66,7 +66,7 @@
 
   // ==================== DELETE ATTENDANCE ====================
   attendanceRouter.delete(
-    "/:id",
+    "/student/:id",
     authMiddleware,
     roleMiddleware(["super_admin", "admin"]),
     deleteAttendance,

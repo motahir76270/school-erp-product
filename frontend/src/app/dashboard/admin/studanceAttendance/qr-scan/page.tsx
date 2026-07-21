@@ -27,7 +27,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { markAttendanceViaQRApiCall } from '@/store/slices/attendanceSlice';
+import { markAttendanceViaQRApiCall } from '@/src/store/slices/attandance/studanceAttendanceSlice';
 import { getAllClassWithSections } from '@/store/slices/classSlice';
 import { getAllStudentsApiCall } from '@/store/slices/studentSlice';
 import { format } from 'date-fns';

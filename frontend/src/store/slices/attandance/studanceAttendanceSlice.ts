@@ -82,7 +82,7 @@ const initialState: AttendanceState = {
 // ==================== SLICE ====================
 
 const attendanceSlice = createSlice({
-  name: 'attendance',
+  name: 'studentAttendance',
   initialState,
   reducers: {
     setLoading: (state, action: PayloadAction<boolean>) => {
@@ -188,7 +188,7 @@ export const markAttendanceApiCall = async (
 ) => {
   try {
     const { data } = await axios.post(
-      `${API_BASE_URL}/mark`,
+      `${API_BASE_URL}/student/mark`,
       payload,
       getHeaders(token)
     );
@@ -210,7 +210,7 @@ export const markAttendanceViaQRApiCall = async (
 ) => {
   try {
     const { data } = await axios.post(
-      `${API_BASE_URL}/mark-qr`,
+      `${API_BASE_URL}/student/mark-qr`,
       payload,
       getHeaders(token)
     );
@@ -231,7 +231,7 @@ export const getAttendanceByDateApiCall = async (
 ) => {
   try {
     const { data } = await axios.get(
-      `${API_BASE_URL}/date`,
+      `${API_BASE_URL}/student/date`,
       {
         ...getHeaders(token),
         params,
@@ -256,7 +256,7 @@ export const getStudentAttendanceApiCall = async (
 ) => {
   try {
     const { data } = await axios.get(
-      `${API_BASE_URL}/student/${studentId}`,
+      `${API_BASE_URL}/student/attendance/${studentId}`,
       {
         ...getHeaders(token),
         params,
@@ -280,7 +280,7 @@ export const getAttendanceSummaryApiCall = async (
 ) => {
   try {
     const { data } = await axios.get(
-      `${API_BASE_URL}/summary`,
+      `${API_BASE_URL}/student/summary`,
       {
         ...getHeaders(token),
         params,
@@ -303,7 +303,7 @@ export const updateAttendanceStatusApiCall = async (
 ) => {
   try {
     const { data } = await axios.put(
-      `${API_BASE_URL}/log/${logId}`,
+      `${API_BASE_URL}/student/log/${logId}`,
       payload,
       getHeaders(token)
     );
@@ -320,7 +320,7 @@ export const deleteAttendanceApiCall = async (
 ) => {
   try {
     const { data } = await axios.delete(
-      `${API_BASE_URL}/${attendanceId}`,
+      `${API_BASE_URL}/student/${attendanceId}`,
       getHeaders(token)
     );
     return data;
@@ -340,7 +340,7 @@ export const getTodayAttendanceApiCall = async (
   try {
     const today = new Date().toISOString().split('T')[0];
     const { data } = await axios.get(
-      `${API_BASE_URL}/date`,
+      `${API_BASE_URL}/student/date`,
       {
         ...getHeaders(token),
         params: {

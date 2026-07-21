@@ -53,7 +53,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'react-toastify';
-import { getAttendanceByDateApiCall, deleteAttendanceApiCall } from '@/store/slices/attendanceSlice';
+import { getAttendanceByDateApiCall, deleteAttendanceApiCall } from '@/src/store/slices/attandance/studanceAttendanceSlice';
 import { getAllClassWithSections } from '@/store/slices/classSlice';
 import { format as formatDateFn, parseISO } from 'date-fns';
 

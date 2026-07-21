@@ -4,7 +4,8 @@ import userReducer from './slices/userSlice';
 import studentReducer from './slices/studentSlice';
 import teacherReducer from './slices/teacherSlice';
 import classReducer from './slices/classSlice';
-import attendanceReducer from './slices/attendanceSlice';
+import studentAttendanceReducer from './slices/attandance/studanceAttendanceSlice';
+import teacherAttendanceReducer from './slices/attandance/teacherAttendanceSlice'
 import feeReducer from './slices/feeSlice';
 import noticeReducer from './slices/noticeSlice';
 import examReducer from './slices/examSlice';
@@ -26,7 +27,8 @@ export const store = configureStore({
     student: studentReducer,
     teacher: teacherReducer,
     class: classReducer,
-    attendance: attendanceReducer,
+    studentAttendance: studentAttendanceReducer,
+    teacherAttendance:teacherAttendanceReducer,
     fee: feeReducer,
     receipt: receiptReducer,
     notice: noticeReducer,

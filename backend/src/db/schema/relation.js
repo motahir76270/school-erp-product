@@ -7,8 +7,10 @@ import {
   sections,
   subjects,
   classSubjects,
-  attendance,
-  attendanceLogs,
+  studentAttendance,
+  studentAttendanceLogs,
+  teacherAttendance,
+  teacherAttendanceLogs,
   feeTypes,
   studentFees,
   feePayments,
@@ -32,50 +34,44 @@ import {
   settings,
   auditLogs,
   teacherSalaries,
+  teacherPermission,
+  userPermission,
   paymentGateway,
-  postLikes,
   posts,
+  postLikes,
   accounts,
   accountHistory,
   schools,
-  teacherPermission,
-  userPermission,
 } from "./users.js";
 
-// User relations
-export const usersRelations = relations(users, ({ many, one }) => ({
+// ==================== USERS RELATIONS ====================
+export const usersRelations = relations(users, ({ many }) => ({
+  students: many(students),
+  teachers: many(teachers),
+  classes: many(classes),
+  sections: many(sections),
+  subjects: many(subjects),
+  feeTypes: many(feeTypes),
+  studentFees: many(studentFees),
+  notices: many(notices),
+  mcqTests: many(mcqTests),
+  exams: many(exams),
+  assignments: many(assignments),
+  events: many(events),
   notifications: many(notifications),
-  post: many(posts),
-  like: one(postLikes),
   auditLogs: many(auditLogs),
-  accounts: one(accounts),
-  schools: one(schools),
-  paymentGateway: one(paymentGateway),
-  userPermission:many(userPermission)
+  teacherSalaries: many(teacherSalaries),
+  teacherPermissions: many(teacherPermission),
+  userPermissions: many(userPermission),
+  paymentGateways: many(paymentGateway),
+  posts: many(posts),
+  postLikes: many(postLikes),
+  accounts: many(accounts),
+  accountHistory: many(accountHistory),
+  schools: many(schools),
 }));
 
-export const schoolRelation = relations(schools, ({ one }) => ({
-  user: one(users, {
-    fields: [schools.userId],
-    references: [users.id],
-  }),
-}));
-
-export const postRelation = relations(posts , ({one}) => ({
-   user:one(users , {
-    fields: [posts.userId],
-    references: [users.id],
-   }),
-}) )
-
-export const postLikeRlation = relations(postLikes,({one}) => ({
-   user:one(users, {
-    fields: [postLikes.userId],
-    references:[users.id]
-   })
-}))
-
-// Student relations
+// ==================== STUDENTS RELATIONS ====================
 export const studentsRelations = relations(students, ({ one, many }) => ({
   user: one(users, {
     fields: [students.userId],
@@ -89,68 +85,77 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
     fields: [students.sectionId],
     references: [sections.id],
   }),
-  attendanceLogs: many(attendanceLogs),
+  attendanceLogs: many(studentAttendanceLogs),
   studentFees: many(studentFees),
   mcqAnswers: many(mcqAnswers),
-  mcqTestResults: many(mcqTestResults),
+  mcqResults: many(mcqTestResults),
   marks: many(marks),
   results: many(results),
   submissions: many(submissions),
   bookIssues: many(bookIssues),
 }));
 
-// Teacher relations
+// ==================== TEACHERS RELATIONS ====================
 export const teachersRelations = relations(teachers, ({ one, many }) => ({
   user: one(users, {
     fields: [teachers.userId],
     references: [users.id],
   }),
-  classSubjects: many(classSubjects),
-  attendance: many(attendance),
-  mcqTests: many(mcqTests),
-  marks: many(marks),
-  assignments: many(assignments),
+  attendanceLogs: many(teacherAttendanceLogs),
+  timetable: many(timetable),
+  teacherSalaries: many(teacherSalaries),
+  teacherPermissions: many(teacherPermission),
   bookIssues: many(bookIssues),
-  salaries: many(teacherSalaries),
-  permission: many(teacherPermission),
 }));
 
-// Class relations - Removed classTeacher relation
-export const classesRelations = relations(classes, ({ many }) => ({
+// ==================== CLASSES RELATIONS ====================
+export const classesRelations = relations(classes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [classes.userId],
+    references: [users.id],
+  }),
   sections: many(sections),
-  students: many(students),
   classSubjects: many(classSubjects),
-  attendance: many(attendance),
+  students: many(students),
+  studentAttendance: many(studentAttendance),
   timetable: many(timetable),
   mcqTests: many(mcqTests),
   exams: many(exams),
-  results: many(results),
   assignments: many(assignments),
+  results: many(results),
 }));
 
-// Section relations - Removed teacher relation
+// ==================== SECTIONS RELATIONS ====================
 export const sectionsRelations = relations(sections, ({ one, many }) => ({
   class: one(classes, {
     fields: [sections.classId],
     references: [classes.id],
   }),
+  user: one(users, {
+    fields: [sections.userId],
+    references: [users.id],
+  }),
   students: many(students),
-  attendance: many(attendance),
+  studentAttendance: many(studentAttendance),
   timetable: many(timetable),
   assignments: many(assignments),
 }));
 
-// Subject relations
-export const subjectsRelations = relations(subjects, ({ many }) => ({
+// ==================== SUBJECTS RELATIONS ====================
+export const subjectsRelations = relations(subjects, ({ one, many }) => ({
+  user: one(users, {
+    fields: [subjects.userId],
+    references: [users.id],
+  }),
   classSubjects: many(classSubjects),
   timetable: many(timetable),
   mcqTests: many(mcqTests),
   exams: many(exams),
-  marks: many(marks),
   assignments: many(assignments),
+  marks: many(marks),
 }));
 
-// Class Subject relations
+// ==================== CLASS SUBJECTS RELATIONS ====================
 export const classSubjectsRelations = relations(classSubjects, ({ one }) => ({
   class: one(classes, {
     fields: [classSubjects.classId],
@@ -160,48 +165,89 @@ export const classSubjectsRelations = relations(classSubjects, ({ one }) => ({
     fields: [classSubjects.subjectId],
     references: [subjects.id],
   }),
-  teacher: one(users, {
+  user: one(users, {
     fields: [classSubjects.userId],
     references: [users.id],
   }),
 }));
 
-// Attendance relations
-export const attendanceRelations = relations(attendance, ({ one, many }) => ({
-  class: one(classes, {
-    fields: [attendance.classId],
-    references: [classes.id],
+// ==================== STUDENT ATTENDANCE RELATIONS ====================
+export const studentAttendanceRelations = relations(
+  studentAttendance,
+  ({ one, many }) => ({
+    class: one(classes, {
+      fields: [studentAttendance.classId],
+      references: [classes.id],
+    }),
+    section: one(sections, {
+      fields: [studentAttendance.sectionId],
+      references: [sections.id],
+    }),
+    markedByUser: one(users, {
+      fields: [studentAttendance.markedBy],
+      references: [users.id],
+    }),
+    logs: many(studentAttendanceLogs),
   }),
-  section: one(sections, {
-    fields: [attendance.sectionId],
-    references: [sections.id],
+);
+
+// ==================== STUDENT ATTENDANCE LOGS RELATIONS ====================
+export const studentAttendanceLogsRelations = relations(
+  studentAttendanceLogs,
+  ({ one }) => ({
+    attendance: one(studentAttendance, {
+      fields: [studentAttendanceLogs.attendanceId],
+      references: [studentAttendance.id],
+    }),
+    student: one(students, {
+      fields: [studentAttendanceLogs.studentId],
+      references: [students.id],
+    }),
   }),
-  markedBy: one(users, {
-    fields: [attendance.markedBy],
+);
+
+// ==================== TEACHER ATTENDANCE RELATIONS ====================
+export const teacherAttendanceRelations = relations(
+  teacherAttendance,
+  ({ one, many }) => ({
+    markedByUser: one(users, {
+      fields: [teacherAttendance.markedBy],
+      references: [users.id],
+    }),
+    logs: many(teacherAttendanceLogs),
+  }),
+);
+
+// ==================== TEACHER ATTENDANCE LOGS RELATIONS ====================
+export const teacherAttendanceLogsRelations = relations(
+  teacherAttendanceLogs,
+  ({ one }) => ({
+    attendance: one(teacherAttendance, {
+      fields: [teacherAttendanceLogs.attendanceId],
+      references: [teacherAttendance.id],
+    }),
+    teacher: one(teachers, {
+      fields: [teacherAttendanceLogs.teacherId],
+      references: [teachers.id],
+    }),
+  }),
+);
+
+// ==================== FEE TYPES RELATIONS ====================
+export const feeTypesRelations = relations(feeTypes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [feeTypes.userId],
     references: [users.id],
   }),
-  logs: many(attendanceLogs),
-}));
-
-// Attendance Log relations
-export const attendanceLogsRelations = relations(attendanceLogs, ({ one }) => ({
-  attendance: one(attendance, {
-    fields: [attendanceLogs.attendanceId],
-    references: [attendance.id],
-  }),
-  student: one(students, {
-    fields: [attendanceLogs.studentId],
-    references: [students.id],
-  }),
-}));
-
-// Fee Type relations
-export const feeTypesRelations = relations(feeTypes, ({ many }) => ({
   studentFees: many(studentFees),
 }));
 
-// Student Fee relations
+// ==================== STUDENT FEES RELATIONS ====================
 export const studentFeesRelations = relations(studentFees, ({ one, many }) => ({
+  user: one(users, {
+    fields: [studentFees.userId],
+    references: [users.id],
+  }),
   student: one(students, {
     fields: [studentFees.studentId],
     references: [students.id],
@@ -214,19 +260,19 @@ export const studentFeesRelations = relations(studentFees, ({ one, many }) => ({
   penalties: many(feePenalties),
 }));
 
-// Fee Payment relations
+// ==================== FEE PAYMENTS RELATIONS ====================
 export const feePaymentsRelations = relations(feePayments, ({ one }) => ({
   studentFee: one(studentFees, {
     fields: [feePayments.studentFeeId],
     references: [studentFees.id],
   }),
-  paidBy: one(users, {
+  paidByUser: one(users, {
     fields: [feePayments.paidBy],
     references: [users.id],
   }),
 }));
 
-// Fee Penalty relations
+// ==================== FEE PENALTIES RELATIONS ====================
 export const feePenaltiesRelations = relations(feePenalties, ({ one }) => ({
   studentFee: one(studentFees, {
     fields: [feePenalties.studentFeeId],
@@ -234,18 +280,15 @@ export const feePenaltiesRelations = relations(feePenalties, ({ one }) => ({
   }),
 }));
 
-// Notice relations
+// ==================== NOTICES RELATIONS ====================
 export const noticesRelations = relations(notices, ({ one }) => ({
-  createdBy: one(users, {
+  createdByUser: one(users, {
     fields: [notices.createdBy],
     references: [users.id],
   }),
 }));
 
-// Holiday relations
-export const holidaysRelations = relations(holidays, () => ({}));
-
-// Timetable relations
+// ==================== TIMETABLE RELATIONS ====================
 export const timetableRelations = relations(timetable, ({ one }) => ({
   class: one(classes, {
     fields: [timetable.classId],
@@ -265,7 +308,7 @@ export const timetableRelations = relations(timetable, ({ one }) => ({
   }),
 }));
 
-// MCQ Test relations
+// ==================== MCQ TESTS RELATIONS ====================
 export const mcqTestsRelations = relations(mcqTests, ({ one, many }) => ({
   subject: one(subjects, {
     fields: [mcqTests.subjectId],
@@ -275,7 +318,7 @@ export const mcqTestsRelations = relations(mcqTests, ({ one, many }) => ({
     fields: [mcqTests.classId],
     references: [classes.id],
   }),
-  createdBy: one(users, {
+  createdByUser: one(users, {
     fields: [mcqTests.createdBy],
     references: [users.id],
   }),
@@ -284,15 +327,19 @@ export const mcqTestsRelations = relations(mcqTests, ({ one, many }) => ({
   results: many(mcqTestResults),
 }));
 
-// MCQ Question relations
-export const mcqQuestionsRelations = relations(mcqQuestions, ({ one }) => ({
-  test: one(mcqTests, {
-    fields: [mcqQuestions.testId],
-    references: [mcqTests.id],
+// ==================== MCQ QUESTIONS RELATIONS ====================
+export const mcqQuestionsRelations = relations(
+  mcqQuestions,
+  ({ one, many }) => ({
+    test: one(mcqTests, {
+      fields: [mcqQuestions.testId],
+      references: [mcqTests.id],
+    }),
+    answers: many(mcqAnswers),
   }),
-}));
+);
 
-// MCQ Answer relations
+// ==================== MCQ ANSWERS RELATIONS ====================
 export const mcqAnswersRelations = relations(mcqAnswers, ({ one }) => ({
   test: one(mcqTests, {
     fields: [mcqAnswers.testId],
@@ -308,7 +355,7 @@ export const mcqAnswersRelations = relations(mcqAnswers, ({ one }) => ({
   }),
 }));
 
-// MCQ Test Results relations
+// ==================== MCQ TEST RESULTS RELATIONS ====================
 export const mcqTestResultsRelations = relations(mcqTestResults, ({ one }) => ({
   test: one(mcqTests, {
     fields: [mcqTestResults.testId],
@@ -320,7 +367,7 @@ export const mcqTestResultsRelations = relations(mcqTestResults, ({ one }) => ({
   }),
 }));
 
-// Exam relations
+// ==================== EXAMS RELATIONS ====================
 export const examsRelations = relations(exams, ({ one, many }) => ({
   class: one(classes, {
     fields: [exams.classId],
@@ -330,14 +377,14 @@ export const examsRelations = relations(exams, ({ one, many }) => ({
     fields: [exams.subjectId],
     references: [subjects.id],
   }),
-  createdBy: one(users, {
+  createdByUser: one(users, {
     fields: [exams.createdBy],
     references: [users.id],
   }),
   marks: many(marks),
 }));
 
-// Marks relations
+// ==================== MARKS RELATIONS ====================
 export const marksRelations = relations(marks, ({ one }) => ({
   exam: one(exams, {
     fields: [marks.examId],
@@ -351,13 +398,13 @@ export const marksRelations = relations(marks, ({ one }) => ({
     fields: [marks.subjectId],
     references: [subjects.id],
   }),
-  enteredBy: one(users, {
+  enteredByUser: one(users, {
     fields: [marks.enteredBy],
     references: [users.id],
   }),
 }));
 
-// Results relations
+// ==================== RESULTS RELATIONS ====================
 export const resultsRelations = relations(results, ({ one }) => ({
   student: one(students, {
     fields: [results.studentId],
@@ -369,7 +416,7 @@ export const resultsRelations = relations(results, ({ one }) => ({
   }),
 }));
 
-// Assignment relations
+// ==================== ASSIGNMENTS RELATIONS ====================
 export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
   subject: one(subjects, {
     fields: [assignments.subjectId],
@@ -383,14 +430,14 @@ export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
     fields: [assignments.sectionId],
     references: [sections.id],
   }),
-  createdBy: one(users, {
+  createdByUser: one(users, {
     fields: [assignments.createdBy],
     references: [users.id],
   }),
   submissions: many(submissions),
 }));
 
-// Submission relations
+// ==================== SUBMISSIONS RELATIONS ====================
 export const submissionsRelations = relations(submissions, ({ one }) => ({
   assignment: one(assignments, {
     fields: [submissions.assignmentId],
@@ -400,42 +447,46 @@ export const submissionsRelations = relations(submissions, ({ one }) => ({
     fields: [submissions.studentId],
     references: [students.id],
   }),
-  evaluatedBy: one(users, {
+  evaluatedByUser: one(users, {
     fields: [submissions.evaluatedBy],
     references: [users.id],
   }),
 }));
 
-// Library Book relations
+// ==================== LIBRARY BOOKS RELATIONS ====================
 export const libraryBooksRelations = relations(libraryBooks, ({ many }) => ({
-  issues: many(bookIssues),
+  bookIssues: many(bookIssues),
 }));
 
-// Book Issue relations
+// ==================== BOOK ISSUES RELATIONS ====================
 export const bookIssuesRelations = relations(bookIssues, ({ one }) => ({
   book: one(libraryBooks, {
     fields: [bookIssues.bookId],
     references: [libraryBooks.id],
   }),
-  issuedTo: one(users, {
+  issuedToStudent: one(students, {
     fields: [bookIssues.issuedTo],
-    references: [users.id],
+    references: [students.id],
   }),
-  issuedBy: one(users, {
+  issuedToTeacher: one(teachers, {
+    fields: [bookIssues.issuedTo],
+    references: [teachers.id],
+  }),
+  issuedByUser: one(users, {
     fields: [bookIssues.issuedBy],
     references: [users.id],
   }),
 }));
 
-// Event relations
+// ==================== EVENTS RELATIONS ====================
 export const eventsRelations = relations(events, ({ one }) => ({
-  createdBy: one(users, {
+  createdByUser: one(users, {
     fields: [events.createdBy],
     references: [users.id],
   }),
 }));
 
-// Notification relations
+// ==================== NOTIFICATIONS RELATIONS ====================
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
     fields: [notifications.userId],
@@ -443,10 +494,7 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
-// Settings relations
-export const settingsRelations = relations(settings, () => ({}));
-
-// Audit Log relations
+// ==================== AUDIT LOGS RELATIONS ====================
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, {
     fields: [auditLogs.userId],
@@ -454,7 +502,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
 }));
 
-// Teacher Salary relations
+// ==================== TEACHER SALARIES RELATIONS ====================
 export const teacherSalariesRelations = relations(
   teacherSalaries,
   ({ one }) => ({
@@ -462,23 +510,29 @@ export const teacherSalariesRelations = relations(
       fields: [teacherSalaries.teacherId],
       references: [teachers.id],
     }),
-    generatedBy: one(users, {
+    generatedByUser: one(users, {
       fields: [teacherSalaries.generatedBy],
       references: [users.id],
     }),
   }),
 );
 
-// Teacher Permission relations
-export const teacherPermissionRelations = relations(teacherPermission, ({ one }) => ({
-  teacher: one(teachers, {
-    fields: [teacherPermission.teacherId],
-    references: [teachers.id],
+// ==================== TEACHER PERMISSION RELATIONS ====================
+export const teacherPermissionRelations = relations(
+  teacherPermission,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [teacherPermission.userId],
+      references: [users.id],
+    }),
+    teacher: one(teachers, {
+      fields: [teacherPermission.teacherId],
+      references: [teachers.id],
+    }),
   }),
-}));
+);
 
-
-// Permission relations
+// ==================== USER PERMISSION RELATIONS ====================
 export const userPermissionRelations = relations(userPermission, ({ one }) => ({
   user: one(users, {
     fields: [userPermission.userId],
@@ -486,7 +540,7 @@ export const userPermissionRelations = relations(userPermission, ({ one }) => ({
   }),
 }));
 
-// Payment Gateway relations
+// ==================== PAYMENT GATEWAY RELATIONS ====================
 export const paymentGatewayRelations = relations(paymentGateway, ({ one }) => ({
   user: one(users, {
     fields: [paymentGateway.userId],
@@ -494,16 +548,52 @@ export const paymentGatewayRelations = relations(paymentGateway, ({ one }) => ({
   }),
 }));
 
+// ==================== POSTS RELATIONS ====================
+export const postsRelations = relations(posts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [posts.userId],
+    references: [users.id],
+  }),
+  likes: many(postLikes),
+}));
 
+// ==================== POST LIKES RELATIONS ====================
+export const postLikesRelations = relations(postLikes, ({ one }) => ({
+  post: one(posts, {
+    fields: [postLikes.postId],
+    references: [posts.id],
+  }),
+  user: one(users, {
+    fields: [postLikes.userId],
+    references: [users.id],
+  }),
+}));
 
-
-export const accountsRelations = relations(accounts, ({ many }) => ({
+// ==================== ACCOUNTS RELATIONS ====================
+export const accountsRelations = relations(accounts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [accounts.userId],
+    references: [users.id],
+  }),
   history: many(accountHistory),
 }));
 
+// ==================== ACCOUNT HISTORY RELATIONS ====================
 export const accountHistoryRelations = relations(accountHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [accountHistory.userId],
+    references: [users.id],
+  }),
   account: one(accounts, {
     fields: [accountHistory.accountId],
     references: [accounts.id],
+  }),
+}));
+
+// ==================== SCHOOLS RELATIONS ====================
+export const schoolsRelations = relations(schools, ({ one }) => ({
+  user: one(users, {
+    fields: [schools.userId],
+    references: [users.id],
   }),
 }));

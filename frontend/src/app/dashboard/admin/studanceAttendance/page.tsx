@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, QrCode, History, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { getTodayAttendanceApiCall } from '@/store/slices/attendanceSlice';
+import { getTodayAttendanceApiCall } from '@/src/store/slices/attandance/studanceAttendanceSlice';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 

@@ -7,14 +7,14 @@ import dotenv from 'dotenv';
 import userRouter from "./src/routes/userRoutes.service.js";
 import studentRouter from "./src/routes/studentRoutes.service.js";
 import teacherRouter from "./src/routes/teacherRoutes.service.js";
-import classRouter from "./src/routes/classesRoutes.service.js";
-import attendanceRouter from "./src/routes/attendanceRoutes.service.js";
+import classRouter from "./src/routes/classesRoutes.service.js";;
 import subjectRouter from "./src/routes/subjectRoutes.service.js";
 import postRouter from "./src/routes/post/postAndLikeRoutes.service.js";
 import feesRouter from "./src/routes/fees/feesRoutes.service.js";
 import reciptsRouter from "./src/routes/fees/receiptsRoute.service.js";
 import paymentGatWayRouter from "./src/routes/paymentGateWay/gatewayRoute.service.js";
 import permissionRouter from "./src/routes/permission/permissionRoutes.service.js";
+import attendanceRouter from "./src/routes/attandance/studentRoutes.service.js";
 
 dotenv.config();
 const app = express();

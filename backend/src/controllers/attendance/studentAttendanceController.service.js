@@ -1,13 +1,13 @@
 // src/controllers/attendanceController.js
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, between, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../db/db.js";
+import { db } from "../../db/db.js";
 import {
-  attendance,
-  attendanceLogs,
+  studentAttendance,
+  studentAttendanceLogs,
   students,
-} from "../db/schema/users.js";
-import { successResponse, errorResponse } from "../lib/response.js";
+} from "../../db/schema/users.js";
+import { successResponse, errorResponse } from "../../lib/response.js";
 
 // ==================== MARK ATTENDANCE ====================
 export const markAttendance = async (req, res) => {
@@ -44,14 +44,14 @@ export const markAttendance = async (req, res) => {
     // Check if attendance already marked for this date
     const existingAttendance = await db
       .select()
-      .from(attendance)
+      .from(studentAttendance)
       .where(
         and(
-          eq(attendance.date, date),
-          eq(attendance.classId, classId),
+          eq(studentAttendance.date, date),
+          eq(studentAttendance.classId, classId),
           sectionId
-            ? eq(attendance.sectionId, sectionId)
-            : eq(attendance.sectionId, null),
+            ? eq(studentAttendance.sectionId, sectionId)
+            : eq(studentAttendance.sectionId, null),
         ),
       )
       .limit(1);
@@ -68,7 +68,7 @@ export const markAttendance = async (req, res) => {
 
     // Create attendance record
     const [newAttendance] = await db
-      .insert(attendance)
+      .insert(studentAttendance)
       .values({
         id: attendanceId,
         date: date,
@@ -77,6 +77,7 @@ export const markAttendance = async (req, res) => {
         markedBy: markedBy,
         markingMethod: markingMethod,
       })
+      .returning();
 
     if (!newAttendance) {
       return errorResponse(res, "Failed to create attendance record", 500);
@@ -88,19 +89,38 @@ export const markAttendance = async (req, res) => {
       attendanceId: attendanceId,
       studentId: student.studentId,
       status: student.status || "present",
-      remarks: student.remarks || null,
     }));
 
     const insertedLogs = await db
-      .insert(attendanceLogs)
+      .insert(studentAttendanceLogs)
       .values(attendanceLogsData)
+      .returning();
+
+    // Get student details for response
+    const logsWithStudents = await Promise.all(
+      insertedLogs.map(async (log) => {
+        const [student] = await db
+          .select({
+            id: students.id,
+            name: students.name,
+            rollNumber: students.rollNumber,
+          })
+          .from(students)
+          .where(eq(students.id, log.studentId))
+          .limit(1);
+        return {
+          ...log,
+          student: student || null,
+        };
+      }),
+    );
 
     return successResponse(
       res,
       {
         attendance: newAttendance,
-        logs: insertedLogs,
-        totalStudents: insertedLogs.length,
+        logs: logsWithStudents,
+        totalStudents: logsWithStudents.length,
       },
       "Attendance marked successfully",
       201,
@@ -148,14 +168,14 @@ export const markAttendanceViaQR = async (req, res) => {
     // Check if attendance already exists for this date
     let existingAttendance = await db
       .select()
-      .from(attendance)
+      .from(studentAttendance)
       .where(
         and(
-          eq(attendance.date, date),
-          eq(attendance.classId, classId),
+          eq(studentAttendance.date, date),
+          eq(studentAttendance.classId, classId),
           sectionId
-            ? eq(attendance.sectionId, sectionId)
-            : eq(attendance.sectionId, null),
+            ? eq(studentAttendance.sectionId, sectionId)
+            : eq(studentAttendance.sectionId, null),
         ),
       )
       .limit(1);
@@ -165,7 +185,7 @@ export const markAttendanceViaQR = async (req, res) => {
     if (existingAttendance.length === 0) {
       // Create new attendance record
       const [newAttendance] = await db
-        .insert(attendance)
+        .insert(studentAttendance)
         .values({
           id: uuidv4(),
           date: date,
@@ -174,6 +194,7 @@ export const markAttendanceViaQR = async (req, res) => {
           markedBy: markedBy,
           markingMethod: "qrcode",
         })
+        .returning();
 
       if (!newAttendance) {
         return errorResponse(res, "Failed to create attendance record", 500);
@@ -186,30 +207,35 @@ export const markAttendanceViaQR = async (req, res) => {
     // Check if student already marked attendance for this date
     const existingLog = await db
       .select()
-      .from(attendanceLogs)
+      .from(studentAttendanceLogs)
       .where(
         and(
-          eq(attendanceLogs.attendanceId, attendanceId),
-          eq(attendanceLogs.studentId, studentId),
+          eq(studentAttendanceLogs.attendanceId, attendanceId),
+          eq(studentAttendanceLogs.studentId, studentId),
         ),
       )
       .limit(1);
 
     if (existingLog.length > 0) {
-      // Update existing log with check-in time
+      // Update existing log
       const [updatedLog] = await db
-        .update(attendanceLogs)
+        .update(studentAttendanceLogs)
         .set({
           status: "present",
           markedAt: new Date(),
         })
-        .where(eq(attendanceLogs.id, existingLog[0].id))
-  
+        .where(eq(studentAttendanceLogs.id, existingLog[0].id))
+        .returning();
+
       return successResponse(
         res,
         {
-          attendance: existingAttendance[0],
           log: updatedLog,
+          student: {
+            id: student.id,
+            name: student.name,
+            rollNumber: student.rollNumber,
+          },
           message: "Attendance updated via QR scan",
         },
         "Attendance updated successfully",
@@ -219,15 +245,14 @@ export const markAttendanceViaQR = async (req, res) => {
 
     // Create new attendance log via QR
     const [newLog] = await db
-      .insert(attendanceLogs)
+      .insert(studentAttendanceLogs)
       .values({
         id: uuidv4(),
         attendanceId: attendanceId,
         studentId: studentId,
         status: "present",
-        remarks: "Marked via QR code scan",
       })
-
+      .returning();
 
     if (!newLog) {
       return errorResponse(res, "Failed to mark attendance via QR", 500);
@@ -236,8 +261,8 @@ export const markAttendanceViaQR = async (req, res) => {
     // Get updated attendance
     const [updatedAttendance] = await db
       .select()
-      .from(attendance)
-      .where(eq(attendance.id, attendanceId))
+      .from(studentAttendance)
+      .where(eq(studentAttendance.id, attendanceId))
       .limit(1);
 
     return successResponse(
@@ -273,16 +298,18 @@ export const getAttendanceByDate = async (req, res) => {
       return errorResponse(res, "Date and classId are required", 400);
     }
 
-    let query = db
+    let attendanceRecords = await db
       .select()
-      .from(attendance)
-      .where(and(eq(attendance.date, date), eq(attendance.classId, classId)));
-
-    if (sectionId) {
-      query = query.where(eq(attendance.sectionId, sectionId));
-    }
-
-    const attendanceRecords = await query;
+      .from(studentAttendance)
+      .where(
+        and(
+          eq(studentAttendance.date, date),
+          eq(studentAttendance.classId, classId),
+          sectionId
+            ? eq(studentAttendance.sectionId, sectionId)
+            : eq(studentAttendance.sectionId, null),
+        ),
+      );
 
     if (attendanceRecords.length === 0) {
       return successResponse(
@@ -301,32 +328,26 @@ export const getAttendanceByDate = async (req, res) => {
 
     // Get attendance logs with student details
     const logs = await db
-      .select()
-      .from(attendanceLogs)
-      .where(eq(attendanceLogs.attendanceId, attendanceId));
-
-    // Get student details for each log
-    const logsWithStudents = await Promise.all(
-      logs.map(async (log) => {
-        const [student] = await db
-          .select()
-          .from(students)
-          .where(eq(students.id, log.studentId))
-          .limit(1);
-
-        return {
-          ...log,
-          student: student || null,
-        };
-      }),
-    );
+      .select({
+        id: studentAttendanceLogs.id,
+        studentId: studentAttendanceLogs.studentId,
+        status: studentAttendanceLogs.status,
+        markedAt: studentAttendanceLogs.markedAt,
+        studentName: students.name,
+        studentRollNumber: students.rollNumber,
+        studentEmail: students.email,
+        studentProfileImage: students.profileImage,
+      })
+      .from(studentAttendanceLogs)
+      .leftJoin(students, eq(students.id, studentAttendanceLogs.studentId))
+      .where(eq(studentAttendanceLogs.attendanceId, attendanceId));
 
     return successResponse(
       res,
       {
         attendance: attendanceRecords[0],
-        logs: logsWithStudents,
-        totalStudents: logsWithStudents.length,
+        logs: logs,
+        totalStudents: logs.length,
       },
       "Attendance fetched successfully",
       200,
@@ -347,43 +368,62 @@ export const getStudentAttendance = async (req, res) => {
       return errorResponse(res, "Student ID is required", 400);
     }
 
-    let query = db
-      .select()
-      .from(attendanceLogs)
-      .where(eq(attendanceLogs.studentId, studentId));
+    // Build where conditions
+    let conditions = eq(studentAttendanceLogs.studentId, studentId);
 
-    // Join with attendance table to filter by date
+    if (startDate && endDate) {
+      conditions = and(
+        conditions,
+        between(studentAttendance.date, startDate, endDate),
+      );
+    }
+
     const logs = await db
       .select({
-        log: attendanceLogs,
-        attendance: attendance,
+        id: studentAttendanceLogs.id,
+        attendanceId: studentAttendanceLogs.attendanceId,
+        studentId: studentAttendanceLogs.studentId,
+        status: studentAttendanceLogs.status,
+        markedAt: studentAttendanceLogs.markedAt,
+        date: studentAttendance.date,
+        classId: studentAttendance.classId,
+        sectionId: studentAttendance.sectionId,
+        markedBy: studentAttendance.markedBy,
+        markingMethod: studentAttendance.markingMethod,
       })
-      .from(attendanceLogs)
-      .innerJoin(attendance, eq(attendance.id, attendanceLogs.attendanceId))
-      .where(eq(attendanceLogs.studentId, studentId))
+      .from(studentAttendanceLogs)
+      .innerJoin(
+        studentAttendance,
+        eq(studentAttendance.id, studentAttendanceLogs.attendanceId),
+      )
+      .where(conditions)
+      .orderBy(desc(studentAttendance.date))
       .limit(parseInt(limit))
       .offset(parseInt(offset));
 
-    const total = logs.length;
+    // Get total count
+    const [countResult] = await db
+      .select({
+        total: sql`COUNT(*)`.as("total"),
+      })
+      .from(studentAttendanceLogs)
+      .innerJoin(
+        studentAttendance,
+        eq(studentAttendance.id, studentAttendanceLogs.attendanceId),
+      )
+      .where(conditions);
 
-    const formattedLogs = logs.map((item) => ({
-      ...item.log,
-      date: item.attendance.date,
-      classId: item.attendance.classId,
-      sectionId: item.attendance.sectionId,
-      markedBy: item.attendance.markedBy,
-      markingMethod: item.attendance.markingMethod,
-    }));
+    const total = parseInt(countResult?.total || 0);
 
     return successResponse(
       res,
       {
-        logs: formattedLogs,
+        logs: logs,
         pagination: {
           limit: parseInt(limit),
           offset: parseInt(offset),
           total,
-          hasMore: total === parseInt(limit),
+          hasMore: offset + logs.length < total,
         },
       },
       "Student attendance fetched successfully",
@@ -403,7 +443,7 @@ export const getStudentAttendance = async (req, res) => {
 export const updateAttendanceStatus = async (req, res) => {
   try {
     const { logId } = req.params;
-    const { status, remarks } = req.body;
+    const { status } = req.body;
 
     if (!logId) {
       return errorResponse(res, "Attendance log ID is required", 400);
@@ -423,24 +463,22 @@ export const updateAttendanceStatus = async (req, res) => {
 
     const [existingLog] = await db
       .select()
-      .from(attendanceLogs)
-      .where(eq(attendanceLogs.id, logId))
+      .from(studentAttendanceLogs)
+      .where(eq(studentAttendanceLogs.id, logId))
       .limit(1);
 
     if (!existingLog) {
       return errorResponse(res, "Attendance log not found", 404);
     }
 
-    const updateData = {
-      status: status,
-      updatedAt: new Date(),
-    };
-    if (remarks !== undefined) updateData.remarks = remarks;
-
     const [updatedLog] = await db
-      .update(attendanceLogs)
-      .set(updateData)
-      .where(eq(attendanceLogs.id, logId))
+      .update(studentAttendanceLogs)
+      .set({
+        status: status,
+        markedAt: new Date(),
+      })
+      .where(eq(studentAttendanceLogs.id, logId))
+      .returning();
 
     if (!updatedLog) {
       return errorResponse(res, "Failed to update attendance status", 500);
@@ -476,34 +514,29 @@ export const getAttendanceSummary = async (req, res) => {
     }
 
     // Get all students in the class
-    const classStudents = await db
+    let classStudents = await db
       .select()
       .from(students)
-      .where(eq(students.classId, classId));
-
-    if (sectionId) {
-      // Filter by section if provided
-      const filteredStudents = classStudents.filter(
-        (student) => student.sectionId === sectionId,
-      );
-      classStudents.length = 0;
-      classStudents.push(...filteredStudents);
-    }
-
-    // Get attendance for the date range
-    const attendanceRecords = await db
-      .select()
-      .from(attendance)
       .where(
         and(
-          eq(attendance.classId, classId),
-          sectionId
-            ? eq(attendance.sectionId, sectionId)
-            : eq(attendance.sectionId, null),
+          eq(students.classId, classId),
+          sectionId ? eq(students.sectionId, sectionId) : sql`1=1`,
         ),
       );
 
-    // Get logs for each attendance record
+    // Get attendance records for the date range
+    const attendanceRecords = await db
+      .select()
+      .from(studentAttendance)
+      .where(
+        and(
+          eq(studentAttendance.classId, classId),
+          between(studentAttendance.date, startDate, endDate),
+          sectionId ? eq(studentAttendance.sectionId, sectionId) : sql`1=1`,
+        ),
+      );
+
+    // Generate summary for each student
     const summary = await Promise.all(
       classStudents.map(async (student) => {
         let present = 0,
@@ -514,11 +547,11 @@ export const getAttendanceSummary = async (req, res) => {
         for (const record of attendanceRecords) {
           const [log] = await db
             .select()
-            .from(attendanceLogs)
+            .from(studentAttendanceLogs)
             .where(
               and(
-                eq(attendanceLogs.attendanceId, record.id),
-                eq(attendanceLogs.studentId, student.id),
+                eq(studentAttendanceLogs.attendanceId, record.id),
+                eq(studentAttendanceLogs.studentId, student.id),
               ),
             )
             .limit(1);
@@ -538,18 +571,21 @@ export const getAttendanceSummary = async (req, res) => {
                 leave++;
                 break;
             }
+          } else {
+            absent++; // Count as absent if no log found
           }
         }
 
         const totalDays = attendanceRecords.length;
-        const percentage =
-          totalDays > 0 ? ((present + late) / totalDays) * 100 : 0;
+        const attendedDays = present + late;
+        const percentage = totalDays > 0 ? (attendedDays / totalDays) * 100 : 0;
 
         return {
           student: {
             id: student.id,
             name: student.name,
             rollNumber: student.rollNumber,
+            email: student.email,
           },
           attendance: {
             present,
@@ -557,6 +593,7 @@ export const getAttendanceSummary = async (req, res) => {
             late,
             leave,
             totalDays,
+            attendedDays,
             percentage: Math.round(percentage * 100) / 100,
           },
         };
@@ -571,6 +608,7 @@ export const getAttendanceSummary = async (req, res) => {
         sectionId: sectionId || null,
         dateRange: { startDate, endDate },
         totalStudents: summary.length,
+        totalDays: attendanceRecords.length,
       },
       "Attendance summary fetched successfully",
       200,
@@ -596,8 +634,8 @@ export const deleteAttendance = async (req, res) => {
 
     const [existingAttendance] = await db
       .select()
-      .from(attendance)
-      .where(eq(attendance.id, id))
+      .from(studentAttendance)
+      .where(eq(studentAttendance.id, id))
       .limit(1);
 
     if (!existingAttendance) {
@@ -605,10 +643,12 @@ export const deleteAttendance = async (req, res) => {
     }
 
     // Delete all logs first
-    await db.delete(attendanceLogs).where(eq(attendanceLogs.attendanceId, id));
+    await db
+      .delete(studentAttendanceLogs)
+      .where(eq(studentAttendanceLogs.attendanceId, id));
 
     // Delete attendance record
-    await db.delete(attendance).where(eq(attendance.id, id));
+    await db.delete(studentAttendance).where(eq(studentAttendance.id, id));
 
     return successResponse(
       res,
@@ -621,6 +661,102 @@ export const deleteAttendance = async (req, res) => {
     return errorResponse(
       res,
       error.message || "Failed to delete attendance",
+      500,
+    );
+  }
+};
+
+// ==================== GET TODAY'S ATTENDANCE ====================
+export const getTodayAttendance = async (req, res) => {
+  try {
+    const { classId, sectionId } = req.query;
+    const today = new Date().toISOString().split("T")[0];
+
+    if (!classId) {
+      return errorResponse(res, "Class ID is required", 400);
+    }
+
+    const attendanceRecords = await db
+      .select()
+      .from(studentAttendance)
+      .where(
+        and(
+          eq(studentAttendance.date, today),
+          eq(studentAttendance.classId, classId),
+          sectionId
+            ? eq(studentAttendance.sectionId, sectionId)
+            : eq(studentAttendance.sectionId, null),
+        ),
+      );
+
+    if (attendanceRecords.length === 0) {
+      return successResponse(
+        res,
+        {
+          attendance: null,
+          logs: [],
+          message: "No attendance marked for today",
+        },
+        "No attendance for today",
+        200,
+      );
+    }
+
+    const attendanceId = attendanceRecords[0].id;
+
+    const logs = await db
+      .select({
+        id: studentAttendanceLogs.id,
+        studentId: studentAttendanceLogs.studentId,
+        status: studentAttendanceLogs.status,
+        markedAt: studentAttendanceLogs.markedAt,
+        studentName: students.name,
+        studentRollNumber: students.rollNumber,
+        studentEmail: students.email,
+        studentProfileImage: students.profileImage,
+      })
+      .from(studentAttendanceLogs)
+      .leftJoin(students, eq(students.id, studentAttendanceLogs.studentId))
+      .where(eq(studentAttendanceLogs.attendanceId, attendanceId));
+
+    // Get all students in class to check who hasn't been marked
+    const allStudents = await db
+      .select()
+      .from(students)
+      .where(
+        and(
+          eq(students.classId, classId),
+          sectionId ? eq(students.sectionId, sectionId) : sql`1=1`,
+        ),
+      );
+
+    const markedStudentIds = logs.map((log) => log.studentId);
+    const unmarkedStudents = allStudents.filter(
+      (student) => !markedStudentIds.includes(student.id),
+    );
+
+    return successResponse(
+      res,
+      {
+        attendance: attendanceRecords[0],
+        logs: logs,
+        unmarkedStudents: unmarkedStudents.map((s) => ({
+          id: s.id,
+          name: s.name,
+          rollNumber: s.rollNumber,
+        })),
+        totalMarked: logs.length,
+        totalStudents: allStudents.length,
+        totalUnmarked: unmarkedStudents.length,
+      },
+      "Today's attendance fetched successfully",
+      200,
+    );
+  } catch (error) {
+    console.error("Get today's attendance error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to get today's attendance",
       500,
     );
   }
