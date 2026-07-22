@@ -71,7 +71,7 @@ export const getAllTeacherPermissions = async (req, res) => {
     const teacherData = await db.query.teachers.findMany({
       where: whereClause,
       with: {
-        permission: true,
+        teacherPermissions: true,
       },
       limit: limitNum,
       offset,

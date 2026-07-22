@@ -73,7 +73,7 @@ export const getAllUserPermissions = async (req, res) => {
     const userData = await db.query.users.findMany({
       where: whereClause,
       with: {
-        userPermission: true,
+        userPermissions: true,
       },
       limit: limitNum,
       offset,

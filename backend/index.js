@@ -15,6 +15,8 @@ import reciptsRouter from "./src/routes/fees/receiptsRoute.service.js";
 import paymentGatWayRouter from "./src/routes/paymentGateWay/gatewayRoute.service.js";
 import permissionRouter from "./src/routes/permission/permissionRoutes.service.js";
 import attendanceRouter from "./src/routes/attandance/studentRoutes.service.js";
+import studentAttendanceRouter from "./src/routes/attandance/studentRoutes.service.js";
+import teacherAttendanceRouter from "./src/routes/attandance/teacherRoutes.service.js";
 
 dotenv.config();
 const app = express();
@@ -46,7 +48,8 @@ app.use("/api/auth", userRouter);
 app.use("/api/students", studentRouter);
 app.use("/api/teachers", teacherRouter);
 app.use("/api/classes", classRouter);
-app.use("/api/attendance", attendanceRouter);
+app.use("/api/attendance", studentAttendanceRouter);
+app.use("/api/attendance", teacherAttendanceRouter);
 app.use("/api/subjects", subjectRouter);
 app.use('/api/posts', postRouter)
 app.use('/api/fees', feesRouter)

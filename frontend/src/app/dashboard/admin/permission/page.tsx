@@ -106,7 +106,7 @@ interface UserWithPermission {
   isActive: boolean;
   phone: string | null;
   address: string | null;
-  userPermission: UserPermission | null;
+  userPermissions: UserPermission[] | null; // ✅ Changed to match API
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -209,6 +209,8 @@ export default function PermissionPage() {
         limit: 10,
       });
 
+      console.log('📦 API Response:', JSON.stringify(response, null, 2));
+
       if (response?.success) {
         let usersData: UserWithPermission[] = [];
         let paginationData = {
@@ -229,12 +231,24 @@ export default function PermissionPage() {
           usersData = response.data;
         }
 
-        const formattedUsers = usersData.map((user: any) => ({
-          ...user,
-          userPermission: user.userPermission && Array.isArray(user.userPermission) && user.userPermission.length > 0
-            ? user.userPermission[0]
-            : null
-        }));
+        // ✅ FIX: The API returns "userPermissions" array
+        const formattedUsers = usersData.map((user: any) => {
+          // Check if userPermissions exists and is an array with items
+          let permission = null;
+          if (user.userPermissions && Array.isArray(user.userPermissions) && user.userPermissions.length > 0) {
+            permission = user.userPermissions[0];
+          }
+          
+          return {
+            ...user,
+            // Keep the original array
+            userPermissions: user.userPermissions || null,
+            // For backward compatibility with existing code
+            userPermission: permission
+          };
+        });
+
+        console.log('✅ Formatted Users:', formattedUsers);
 
         dispatch(setUserPermissions({
           users: formattedUsers,
@@ -260,12 +274,22 @@ export default function PermissionPage() {
     fetchUsers();
   }, [page, search]);
 
+  // ✅ Helper to get the first permission from userPermissions array
+  const getFirstPermission = (user: UserWithPermission): UserPermission | null => {
+    if (user.userPermissions && Array.isArray(user.userPermissions) && user.userPermissions.length > 0) {
+      return user.userPermissions[0];
+    }
+    return null;
+  };
+
   // Handle toggle single permission
   const handleTogglePermission = async (
     userId: string,
     permissionKey: string,
     currentValue: boolean
   ) => {
+    console.log('🔄 Toggle called:', { userId, permissionKey, currentValue });
+    
     const token = localStorage.getItem('accessToken');
     if (!token) {
       toast.error('No authentication token found');
@@ -273,15 +297,30 @@ export default function PermissionPage() {
     }
 
     const user = usersWithPermissions.find((u: any) => u.id === userId);
-    const existingPermission = user?.userPermission || null;
+    if (!user) {
+      toast.error('User not found');
+      return;
+    }
+
+    // ✅ Get the first permission from userPermissions array
+    const existingPermission = getFirstPermission(user);
+    
+    console.log('📝 Existing permission:', existingPermission);
     
     setIsSubmitting(true);
     try {
       if (existingPermission) {
-        const data = await updateUserPermissionStatusApiCall(token, existingPermission.id, {
-          permission: permissionKey as any,
-          value: !currentValue,
-        });
+        // ✅ Update existing permission using permission ID
+        const data = await updateUserPermissionStatusApiCall(
+          token, 
+          existingPermission.id, // This is the PERMISSION ID
+          {
+            permission: permissionKey as any,
+            value: !currentValue,
+          }
+        );
+
+        console.log('📡 Update response:', data);
 
         if (data?.success) {
           toast.success(data?.message || `Permission ${!currentValue ? 'enabled' : 'disabled'}`);
@@ -290,6 +329,7 @@ export default function PermissionPage() {
           toast.error(data?.message || 'Failed to update permission');
         }
       } else {
+        // ✅ Create new permission
         const newPermission: any = {
           userId,
           attendance: false,
@@ -599,7 +639,10 @@ export default function PermissionPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">With Permissions</p>
                 <p className="text-2xl font-bold">
-                  {usersWithPermissions.filter((u: any) => u.userPermission && hasAnyPermission(u.userPermission)).length}
+                  {usersWithPermissions.filter((u: any) => {
+                    const perm = getFirstPermission(u);
+                    return perm && hasAnyPermission(perm);
+                  }).length}
                 </p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -682,8 +725,24 @@ export default function PermissionPage() {
                   </TableRow>
                 ) : (
                   usersWithPermissions.map((user: any) => {
-                    const permission = user.userPermission;
+                    // ✅ Get the first permission from userPermissions array
+                    const permission = getFirstPermission(user);
                     const hasPermission = !!permission && hasAnyPermission(permission);
+                    
+                    console.log(`👤 Rendering ${user.firstName} ${user.lastName}:`, {
+                      hasPermission,
+                      permissionId: permission?.id,
+                      permissions: permission ? {
+                        attendance: permission.attendance,
+                        subject: permission.subject,
+                        classes: permission.classes,
+                        exam: permission.exam,
+                        fee: permission.fee,
+                        users: permission.users,
+                        students: permission.students,
+                        teachers: permission.teachers,
+                      } : 'No permission'
+                    });
                     
                     return (
                       <TableRow key={user.id}>
@@ -718,21 +777,24 @@ export default function PermissionPage() {
                         </TableCell>
 
                         {/* Permission Switches */}
-                        {permissionKeys.map((perm) => (
-                          <TableCell key={perm} className="text-center">
-                            <Switch
-                              checked={hasPermission ? permission[perm as keyof UserPermission] || false : false}
-                              onCheckedChange={() => 
-                                handleTogglePermission(
-                                  user.id,
-                                  perm,
-                                  hasPermission ? permission[perm as keyof UserPermission] || false : false
-                                )
-                              }
-                              disabled={isSubmitting}
-                            />
-                          </TableCell>
-                        ))}
+                        {permissionKeys.map((perm) => {
+                          const isEnabled = hasPermission ? permission[perm as keyof UserPermission] || false : false;
+                          return (
+                            <TableCell key={perm} className="text-center">
+                              <Switch
+                                checked={isEnabled}
+                                onCheckedChange={() => 
+                                  handleTogglePermission(
+                                    user.id,
+                                    perm,
+                                    isEnabled
+                                  )
+                                }
+                                disabled={isSubmitting}
+                              />
+                            </TableCell>
+                          );
+                        })}
 
                         {/* Actions */}
                         <TableCell className="text-right">
@@ -743,7 +805,7 @@ export default function PermissionPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              {hasPermission && (
+                              {hasPermission && permission && (
                                 <>
                                   <DropdownMenuItem>
                                     <span className="text-xs text-muted-foreground">
@@ -753,10 +815,11 @@ export default function PermissionPage() {
                                   <DropdownMenuItem 
                                     onClick={() => {
                                       permissionKeys.forEach((p) => {
+                                        const currentValue = permission[p as keyof UserPermission] || false;
                                         handleTogglePermission(
                                           user.id,
                                           p,
-                                          hasPermission ? permission[p as keyof UserPermission] || false : false
+                                          currentValue
                                         );
                                       });
                                     }}
@@ -768,7 +831,7 @@ export default function PermissionPage() {
                               )}
                               <DropdownMenuItem 
                                 onClick={() => {
-                                  if (hasPermission) {
+                                  if (hasPermission && permission) {
                                     handleDeletePermission(permission.id, `${user.firstName} ${user.lastName}`);
                                   } else {
                                     toast.info('No permissions to delete for this user');

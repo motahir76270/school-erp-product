@@ -17,7 +17,7 @@ export default function AttendanceDashboardPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state:any) => state.auth);
-  const { todayAttendance, stats, isLoading } = useAppSelector((state) => state.attendance);
+  const { todayAttendance, stats, isLoading } = useAppSelector((state) => state.studentAttendance)
   const [todayDate, setTodayDate] = useState(format(new Date(), 'dd MMMM yyyy'));
 
   useEffect(() => {
@@ -83,21 +83,21 @@ export default function AttendanceDashboardPage() {
       title: 'Mark Attendance',
       description: 'Manually mark student attendance',
       icon: Users,
-      href: '/dashboard/admin/attendance/manual',
+      href: '/dashboard/admin/studentAttendance/manual',
       color: 'bg-blue-500',
     },
     {
       title: 'QR Scan',
       description: 'Scan QR code to mark attendance',
       icon: QrCode,
-      href: '/dashboard/admin/attendance/qr-scan',
+      href: '/dashboard/admin/studentAttendance/qr-scan',
       color: 'bg-purple-500',
     },
     {
       title: 'Attendance History',
       description: 'View past attendance records',
       icon: History,
-      href: '/dashboard/admin/attendance/history',
+      href: '/dashboard/admin/studentAttendance/history',
       color: 'bg-green-500',
     },
   ];

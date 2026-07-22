@@ -57,7 +57,6 @@ import {
   Trash2,
   Plus,
   X,
-  GraduationCap,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -67,7 +66,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-interface Teacher {
+interface TeacherPermission {
+  id: string;
+  userId: string;
+  teacherId: string;
+  attendance: boolean;
+  subject: boolean;
+  classes: boolean;
+  exam: boolean;
+  fee: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TeacherWithPermission {
   id: string;
   userId: string | null;
   username: string;
@@ -89,41 +101,14 @@ interface Teacher {
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
-}
-
-interface TeacherPermission {
-  id: string;
-  userId: string;
-  teacherId: string;
-  attendance: boolean;
-  subject: boolean;
-  classes: boolean;
-  exam: boolean;
-  fee: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface TeacherWithPermission {
-  id: string;
-  name: string;
-  email: string;
-  employeeId: string;
-  profileImage: string | null;
-  isActive: boolean;
-  qualification: string | null;
-  experience: string | null;
-  specialization: string | null;
-  permission: TeacherPermission[] | null;  // ✅ Changed from teacherPermission to permission (array)
-  createdAt: string;
-  updatedAt: string;
+  teacherPermissions: TeacherPermission[] | null; // ✅ This is the correct field name
 }
 
 export default function TeacherPermissionPage() {
   const dispatch = useAppDispatch();
   const { teacherPermissions, loading: permissionLoading } = useAppSelector((state: any) => state.permission);
   const { teachers, loading: teacherLoading } = useAppSelector((state: any) => state.teacher);
-
+  
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -207,10 +192,10 @@ export default function TeacherPermissionPage() {
         limit: 10,
       });
 
-      console.log('Teacher Permissions API Response:', response);
+      console.log('📦 Full API Response:', JSON.stringify(response, null, 2));
 
       if (response?.success) {
-        let teachersData: any[] = [];
+        let teachersData: TeacherWithPermission[] = [];
         let paginationData = {
           currentPage: 1,
           totalPages: 0,
@@ -220,8 +205,8 @@ export default function TeacherPermissionPage() {
           hasPrevPage: false,
         };
 
-        // Extract teachers from response
-        if (response.data?.teachers) {
+        // ✅ Extract teachers from response.data.teachers
+        if (response.data?.teachers && Array.isArray(response.data.teachers)) {
           teachersData = response.data.teachers;
           paginationData = response.data.pagination || paginationData;
         } else if (response.data?.data && Array.isArray(response.data.data)) {
@@ -230,29 +215,18 @@ export default function TeacherPermissionPage() {
           teachersData = response.data;
         }
 
-        // ✅ FIX: Format the data - the API returns "permission" array, not "teacherPermission"
-        const formattedTeachers = teachersData.map((teacher: any) => {
-          // The API returns "permission" as an array
-          // We need to keep it as an array or take the first item
-          let permission = null;
-          
-          if (teacher.permission && Array.isArray(teacher.permission) && teacher.permission.length > 0) {
-            // Take the first permission from the array
-            permission = teacher.permission[0];
-          }
-          
-          return {
-            ...teacher,
-            // Keep both for compatibility
-            permission: teacher.permission || null,
-            teacherPermission: permission // For backward compatibility
-          };
+        // ✅ DEBUG: Log each teacher's permission data
+        teachersData.forEach((teacher, index) => {
+          console.log(`👨‍🏫 Teacher ${index + 1} (${teacher.name}):`, {
+            id: teacher.id,
+            hasPermissions: teacher.teacherPermissions !== null && teacher.teacherPermissions !== undefined,
+            permissionsLength: teacher.teacherPermissions?.length || 0,
+            teacherPermissions: teacher.teacherPermissions,
+          });
         });
 
-        console.log('✅ Formatted Teachers:', formattedTeachers);
-
         dispatch(setTeacherPermissions({
-          teachers: formattedTeachers,
+          teachers: teachersData,
           pagination: paginationData
         }));
       } else {
@@ -260,7 +234,7 @@ export default function TeacherPermissionPage() {
         dispatch(setError(response?.message || 'Failed to fetch teacher permissions'));
       }
     } catch (error: any) {
-      console.error('Fetch teacher permissions error:', error);
+      console.error('❌ Fetch teacher permissions error:', error);
       toast.error(error?.response?.data?.message || 'Failed to fetch teacher permissions');
       dispatch(setError(error?.response?.data?.message || 'Failed to fetch teacher permissions'));
     } finally {
@@ -268,7 +242,7 @@ export default function TeacherPermissionPage() {
     }
   };
 
-  const teachersWithPermissions: any[] = teacherPermissions || [];
+  const teachersWithPermissions: TeacherWithPermission[] = teacherPermissions || [];
 
   useEffect(() => {
     fetchPermissions();
@@ -281,86 +255,65 @@ export default function TeacherPermissionPage() {
     return teacher?.userId || null;
   };
 
-  // Handle toggle single permission - EXACTLY like User Permission page
+  // ✅ Helper to get the first permission from teacherPermissions array
+  const getFirstPermission = (teacher: TeacherWithPermission): TeacherPermission | null => {
+    if (teacher.teacherPermissions && Array.isArray(teacher.teacherPermissions) && teacher.teacherPermissions.length > 0) {
+      return teacher.teacherPermissions[0];
+    }
+    return null;
+  };
+
+  // ✅ Handle toggle permission - Using PERMISSION ID
   const handleTogglePermission = async (
     teacherId: string,
     permissionKey: string,
     currentValue: boolean
   ) => {
+    console.log('🔄 Toggle called:', { teacherId, permissionKey, currentValue });
+    
     const token = localStorage.getItem('accessToken');
     if (!token) {
       toast.error('No authentication token found');
       return;
     }
 
-    const teacher = teachersWithPermissions.find((t: any) => t.id === teacherId);
-    // ✅ FIX: Use teacherPermission (which we set from permission[0]) or permission array
-    const existingPermission = teacher?.teacherPermission || null;
-    
-    console.log('🔍 Toggle Debug:', {
-      teacherId,
-      permissionKey,
-      currentValue,
-      hasPermission: !!existingPermission,
-      permissionId: existingPermission?.id,
-      teacher: teacher
-    });
-    
+    // Find the teacher
+    const teacher = teachersWithPermissions.find((t) => t.id === teacherId);
+    if (!teacher) {
+      toast.error('Teacher not found');
+      return;
+    }
+
+    // Get the first permission from teacherPermissions array
+    const permission = getFirstPermission(teacher);
+    if (!permission) {
+      toast.error('No permission record found for this teacher. Please create one first.');
+      return;
+    }
+
+    console.log('📝 Using Permission ID:', permission.id);
+    console.log('📊 Current value for', permissionKey, ':', currentValue);
+    console.log('🔄 New value:', !currentValue);
+
     setIsSubmitting(true);
     try {
-      if (existingPermission) {
-        // ✅ UPDATE: Call status update API with permission ID
-        // This calls PATCH /permissions/teacher/status/${existingPermission.id}
-        console.log('✅ UPDATING teacher permission with ID:', existingPermission.id);
-        
-        const data = await updateTeacherPermissionStatusApiCall(
-          token, 
-          existingPermission.id, // This is the PERMISSION ID
-          {
-            permission: permissionKey as any,
-            value: !currentValue,
-          }
-        );
-
-        console.log('📦 Update Response:', data);
-
-        if (data?.success) {
-          toast.success(data?.message || `Permission ${!currentValue ? 'enabled' : 'disabled'}`);
-          await fetchPermissions();
-        } else {
-          toast.error(data?.message || 'Failed to update permission');
+      // ✅ Using permission ID to update
+      const data = await updateTeacherPermissionStatusApiCall(
+        token,
+        permission.id, // This is the PERMISSION ID
+        {
+          permission: permissionKey,
+          value: !currentValue,
         }
+      );
+
+      console.log('📡 Update response:', data);
+
+      if (data?.success === true) {
+        toast.success(data?.message || `Permission ${!currentValue ? 'enabled' : 'disabled'}`);
+        await fetchPermissions(); // Refresh to get updated data
       } else {
-        // ✅ CREATE: Only when no permission exists
-        console.log('🆕 CREATING new teacher permission for:', teacherId);
-        
-        const userId = getUserIdByTeacherId(teacherId);
-        if (!userId) {
-          toast.error('Teacher does not have a valid user ID');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const newPermission: any = {
-          userId: userId,
-          teacherId: teacherId,
-          attendance: false,
-          subject: false,
-          classes: false,
-          exam: false,
-          fee: false,
-        };
-        newPermission[permissionKey] = true;
-
-        const data = await createTeacherPermissionApiCall(token, newPermission);
-        console.log('📦 Create Response:', data);
-
-        if (data?.success) {
-          toast.success(data?.message || 'Permission created successfully');
-          await fetchPermissions();
-        } else {
-          toast.error(data?.message || 'Failed to create permission');
-        }
+        toast.error(data?.message || 'Failed to update permission');
       }
     } catch (error: any) {
       console.error('❌ Toggle permission error:', error);
@@ -485,8 +438,14 @@ export default function TeacherPermissionPage() {
   };
 
   // Handle delete permission
-  const handleDeletePermission = async (permissionId: string, teacherName: string) => {
-    if (!confirm(`Are you sure you want to delete permissions for ${teacherName}?`)) return;
+  const handleDeletePermission = async (teacher: TeacherWithPermission) => {
+    const permission = getFirstPermission(teacher);
+    if (!permission) {
+      toast.info('No permissions to delete for this teacher');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete permissions for ${teacher.name}?`)) return;
 
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -495,7 +454,7 @@ export default function TeacherPermissionPage() {
     }
 
     try {
-      const data = await deleteTeacherPermissionApiCall(token, permissionId);
+      const data = await deleteTeacherPermissionApiCall(token, permission.id);
       if (data?.success) {
         toast.success(data?.message || 'Permission deleted successfully');
         await fetchPermissions();
@@ -652,7 +611,10 @@ export default function TeacherPermissionPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">With Permissions</p>
                 <p className="text-2xl font-bold">
-                  {teachersWithPermissions.filter((t: any) => t.teacherPermission && hasAnyPermission(t.teacherPermission)).length}
+                  {teachersWithPermissions.filter((t) => {
+                    const perm = getFirstPermission(t);
+                    return perm && hasAnyPermission(perm);
+                  }).length}
                 </p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -736,10 +698,24 @@ export default function TeacherPermissionPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  teachersWithPermissions.map((teacher: any) => {
-                    // ✅ FIX: Use teacherPermission (which we set from permission[0])
-                    const permission = teacher.teacherPermission;
-                    const hasPermission = !!permission && hasAnyPermission(permission);
+                  teachersWithPermissions.map((teacher) => {
+                    // ✅ Get the first permission from teacherPermissions array
+                    const permission = getFirstPermission(teacher);
+                    const hasPermission = !!permission;
+                    
+                    // ✅ Debug: Log each teacher's permission status
+                    console.log(`👨‍🏫 Rendering ${teacher.name}:`, {
+                      teacherId: teacher.id,
+                      hasPermission,
+                      permissionId: permission?.id,
+                      permissions: permission ? {
+                        attendance: permission.attendance,
+                        subject: permission.subject,
+                        classes: permission.classes,
+                        exam: permission.exam,
+                        fee: permission.fee,
+                      } : 'No permission'
+                    });
                     
                     return (
                       <TableRow key={teacher.id}>
@@ -785,22 +761,36 @@ export default function TeacherPermissionPage() {
                           </Badge>
                         </TableCell>
 
-                        {/* Permission Switches */}
-                        {permissionKeys.map((perm) => (
-                          <TableCell key={perm} className="text-center">
-                            <Switch
-                              checked={hasPermission ? permission[perm as keyof TeacherPermission] || false : false}
-                              onCheckedChange={() => 
-                                handleTogglePermission(
-                                  teacher.id,
-                                  perm,
-                                  hasPermission ? permission[perm as keyof TeacherPermission] || false : false
-                                )
-                              }
-                              disabled={isSubmitting}
-                            />
-                          </TableCell>
-                        ))}
+                        {/* Permission Switches - Now properly enabled */}
+                        {permissionKeys.map((perm) => {
+                          // ✅ Get the current value from the permission object
+                          const isEnabled = hasPermission ? permission[perm as keyof TeacherPermission] as boolean : false;
+                          
+                          return (
+                            <TableCell key={perm} className="text-center">
+                              <Switch
+                                checked={isEnabled}
+                                onCheckedChange={() => {
+                                  console.log(`🔄 Toggling ${perm} for ${teacher.name}:`, {
+                                    currentValue: isEnabled,
+                                    newValue: !isEnabled,
+                                    permissionId: permission?.id,
+                                    hasPermission
+                                  });
+                                  handleTogglePermission(
+                                    teacher.id,
+                                    perm,
+                                    isEnabled
+                                  );
+                                }}
+                                disabled={isSubmitting || !hasPermission}
+                              />
+                              {!hasPermission && (
+                                <div className="text-xs text-muted-foreground mt-1">No permission</div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
 
                         {/* Actions */}
                         <TableCell className="text-right">
@@ -811,7 +801,7 @@ export default function TeacherPermissionPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              {hasPermission && (
+                              {hasPermission && permission && (
                                 <>
                                   <DropdownMenuItem>
                                     <span className="text-xs text-muted-foreground">
@@ -821,10 +811,11 @@ export default function TeacherPermissionPage() {
                                   <DropdownMenuItem 
                                     onClick={() => {
                                       permissionKeys.forEach((p) => {
+                                        const currentValue = permission[p as keyof TeacherPermission] as boolean || false;
                                         handleTogglePermission(
                                           teacher.id,
                                           p,
-                                          hasPermission ? permission[p as keyof TeacherPermission] || false : false
+                                          currentValue
                                         );
                                       });
                                     }}
@@ -835,13 +826,7 @@ export default function TeacherPermissionPage() {
                                 </>
                               )}
                               <DropdownMenuItem 
-                                onClick={() => {
-                                  if (hasPermission) {
-                                    handleDeletePermission(permission.id, teacher.name);
-                                  } else {
-                                    toast.info('No permissions to delete for this teacher');
-                                  }
-                                }}
+                                onClick={() => handleDeletePermission(teacher)}
                                 className="text-red-500"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />

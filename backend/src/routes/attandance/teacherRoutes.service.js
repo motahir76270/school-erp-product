@@ -10,31 +10,28 @@ import {
   deleteTeacherAttendance,
   getTodayTeacherAttendance,
   getTeacherAttendanceStatistics,
-} from "../../controllers/attendance/studentAttendanceController.service.js";
+} from "../../controllers/attendance/teacherAttendanceController.service.js";
 
-import attendanceRouter from "./studentRoutes.service.js";
 import { authMiddleware } from "../../middleware/authMiddleware.js";
 
-
-
-// All routes require authentication
-attendanceRouter.use(authenticate);
-
+const teacherAttendanceRouter = express.Router();
 // Mark attendance
-attendanceRouter.post("/teacher/mark",authMiddleware, markTeacherAttendance);
-attendanceRouter.post("/teacher/mark-qr", markTeacherAttendanceViaQR);
+teacherAttendanceRouter.post("/teacher/mark",authMiddleware, markTeacherAttendance);
+teacherAttendanceRouter.post("/teacher/mark-qr",authMiddleware, markTeacherAttendanceViaQR);
 
 // Get attendance
-attendanceRouter.get("/teacher/date",authMiddleware, getTeacherAttendanceByDate);
-attendanceRouter.get("/teacher/today",authMiddleware, getTodayTeacherAttendance);
-attendanceRouter.get("/teacher/summary",authMiddleware, getTeacherAttendanceSummary);
-attendanceRouter.get("/teacher/statistics",authMiddleware, getTeacherAttendanceStatistics);
-attendanceRouter.get("/teacher/:teacherId",authMiddleware, getTeacherAttendanceByTeacher);
+teacherAttendanceRouter.get("/teacher/date",authMiddleware, getTeacherAttendanceByDate);
+teacherAttendanceRouter.get("/teacher/today",authMiddleware, getTodayTeacherAttendance);
+teacherAttendanceRouter.get("/teacher/summary",authMiddleware, getTeacherAttendanceSummary);
+teacherAttendanceRouter.get("/teacher/statistics",authMiddleware, getTeacherAttendanceStatistics);
+teacherAttendanceRouter.get("/teacher/:teacherId",authMiddleware, getTeacherAttendanceByTeacher);
 
 // Update attendance
-attendanceRouter.put("/teacher/log/:logId", updateTeacherAttendanceStatus);
+teacherAttendanceRouter.put("/teacher/log/:logId", updateTeacherAttendanceStatus);
 
 // Delete attendance
-attendanceRouter.delete("/teacher/:id", deleteTeacherAttendance);
+teacherAttendanceRouter.delete("/teacher/:id", deleteTeacherAttendance);
+
+export default teacherAttendanceRouter;
 
 

@@ -14,10 +14,10 @@
     roleMiddleware,
   } from "../../middleware/authMiddleware.js";
 
-  const attendanceRouter = Router();
+  const studentAttendanceRouter = Router();
 
   // ==================== MARK ATTENDANCE ====================
-  attendanceRouter.post(
+  studentAttendanceRouter.post(
     "/student/mark",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
@@ -25,7 +25,7 @@
   );
 
   // ==================== MARK ATTENDANCE VIA QR ====================
-  attendanceRouter.post(
+  studentAttendanceRouter.post(
     "/student/mark-qr",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
@@ -33,7 +33,7 @@
   );
 
   // ==================== GET ATTENDANCE BY DATE ====================
-  attendanceRouter.get(
+  studentAttendanceRouter.get(
     "/student/date",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
@@ -41,7 +41,7 @@
   );
 
   // ==================== GET STUDENT ATTENDANCE ====================
-  attendanceRouter.get(
+  studentAttendanceRouter.get(
     "/student/attendance/:studentId",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
@@ -49,7 +49,7 @@
   );
 
   // ==================== GET ATTENDANCE SUMMARY ====================
-  attendanceRouter.get(
+  studentAttendanceRouter.get(
     "/student/summary",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
@@ -57,7 +57,7 @@
   );
 
   // ==================== UPDATE ATTENDANCE STATUS ====================
-  attendanceRouter.put(
+  studentAttendanceRouter.put(
     "/student/log/:logId",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
@@ -65,11 +65,11 @@
   );
 
   // ==================== DELETE ATTENDANCE ====================
-  attendanceRouter.delete(
+  studentAttendanceRouter.delete(
     "/student/:id",
     authMiddleware,
     roleMiddleware(["super_admin", "admin"]),
     deleteAttendance,
   );
 
-  export default attendanceRouter;
+  export default studentAttendanceRouter;

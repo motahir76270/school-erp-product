@@ -36,13 +36,12 @@ export const markTeacherAttendance = async (req, res) => {
     }
 
     // Check if attendance already marked for this date
-    const existingAttendance = await db
+    const [existingAttendance] = await db
       .select()
       .from(teacherAttendance)
       .where(eq(teacherAttendance.date, date))
-      .limit(1);
 
-    if (existingAttendance.length > 0) {
+    if (existingAttendance) {
       return errorResponse(
         res,
         "Teacher attendance already marked for this date",
@@ -53,15 +52,20 @@ export const markTeacherAttendance = async (req, res) => {
     const attendanceId = uuidv4();
 
     // Create attendance record
-    const [newAttendance] = await db
+    await db
       .insert(teacherAttendance)
       .values({
         id: attendanceId,
         date: date,
         markedBy: markedBy,
         markingMethod: markingMethod,
-      })
-      .returning();
+      });
+
+    // Get the created attendance record
+    const [newAttendance] = await db
+      .select()
+      .from(teacherAttendance)
+      .where(eq(teacherAttendance.id, attendanceId));
 
     if (!newAttendance) {
       return errorResponse(res, "Failed to create attendance record", 500);
@@ -75,10 +79,19 @@ export const markTeacherAttendance = async (req, res) => {
       status: teacher.status || "present",
     }));
 
-    const insertedLogs = await db
+    await db
       .insert(teacherAttendanceLogs)
-      .values(attendanceLogsData)
-      .returning();
+      .values(attendanceLogsData);
+
+    // Get the inserted logs
+    const insertedLogs = await db
+      .select()
+      .from(teacherAttendanceLogs)
+      .where(eq(teacherAttendanceLogs.attendanceId, attendanceId));
+
+    if (!insertedLogs || insertedLogs.length === 0) {
+      return errorResponse(res, "Failed to create attendance logs", 500);
+    }
 
     // Get teacher details for response
     const logsWithTeachers = await Promise.all(
@@ -170,7 +183,7 @@ export const markTeacherAttendanceViaQR = async (req, res) => {
           markedBy: markedBy,
           markingMethod: "qrcode",
         })
-        .returning();
+
 
       if (!newAttendance) {
         return errorResponse(res, "Failed to create attendance record", 500);
@@ -201,17 +214,13 @@ export const markTeacherAttendanceViaQR = async (req, res) => {
           markedAt: new Date(),
         })
         .where(eq(teacherAttendanceLogs.id, existingLog[0].id))
-        .returning();
+
 
       return successResponse(
         res,
         {
           log: updatedLog,
-          teacher: {
-            id: teacher.id,
-            name: teacher.name,
-            employeeId: teacher.employeeId,
-          },
+          teacher: teacher,
           message: "Teacher attendance updated via QR scan",
         },
         "Attendance updated successfully",
@@ -228,7 +237,7 @@ export const markTeacherAttendanceViaQR = async (req, res) => {
         teacherId: teacherId,
         status: "present",
       })
-      .returning();
+
 
     if (!newLog) {
       return errorResponse(
@@ -478,7 +487,6 @@ export const updateTeacherAttendanceStatus = async (req, res) => {
         markedAt: new Date(),
       })
       .where(eq(teacherAttendanceLogs.id, logId))
-      .returning();
 
     if (!updatedLog) {
       return errorResponse(

@@ -39,6 +39,7 @@ permissionRouter.post(
   roleMiddleware(["admin"]),
   bulkCreateTeacherPermissions,
 );
+
 permissionRouter.put(
   "/teacher/:id",
   authMiddleware,
