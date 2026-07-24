@@ -8,6 +8,7 @@
     updateAttendanceStatus,
     getAttendanceSummary,
     deleteAttendance,
+    markAttendanceViaFace,
   } from "../../controllers/attendance/studentAttendanceController.service.js";
   import {
     authMiddleware,
@@ -24,12 +25,20 @@
     markAttendance,
   );
 
-  // ==================== MARK ATTENDANCE VIA QR ====================
+  // ==================== MARK ATTENDANCE VIA QR SCAN ====================
   studentAttendanceRouter.post(
     "/student/mark-qr",
     authMiddleware,
     roleMiddleware(["super_admin", "admin", "teacher"]),
     markAttendanceViaQR,
+  );
+
+  // ==================== MARK ATTENDANCE VIA FACe ====================
+  studentAttendanceRouter.post(
+    "/student/mark-face",
+    authMiddleware,
+    roleMiddleware(["super_admin", "admin", "teacher"]),
+    markAttendanceViaFace,
   );
 
   // ==================== GET ATTENDANCE BY DATE ====================

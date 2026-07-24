@@ -575,6 +575,59 @@ export const updateTeacherProfile = async (req, res) => {
   }
 };
 
+// ==================== SAVE FACE DESCRIPTOR ====================
+export const addFaceDescriptor = async (req, res) => {
+  try {
+    const teacherId =  req.params.id || req.user?.id;
+
+    if (!teacherId) {
+      return errorResponse(res, "teacher not authenticated", 401);
+    }
+
+    const { faceDescriptor } = req.body;
+
+    if (
+      !faceDescriptor ||
+      !Array.isArray(faceDescriptor) ||
+      faceDescriptor.length !== 128
+    ) {
+      return errorResponse(res, "Invalid face descriptor", 400);
+    }
+
+    const [teacher] = await db
+      .select()
+      .from(teachers)
+      .where(eq(teacher.id, teacherId))
+      .limit(1);
+
+    if (!tecaher) {
+      return errorResponse(res, "Student not found", 404);
+    }
+
+    await db
+      .update(teacher)
+      .set({
+        faceDescriptor,
+        updatedAt: new Date(),
+      })
+      .where(eq(teacher.id, teacherId));
+
+    return successResponse(
+      res,
+      null,
+      "Face registered successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Save face descriptor error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to save face descriptor",
+      500
+    );
+  }
+};
+
 // ==================== CHANGE TEACHER PASSWORD ====================
 export const changeTeacherPassword = async (req, res) => {
   try {

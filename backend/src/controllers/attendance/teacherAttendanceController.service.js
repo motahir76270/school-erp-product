@@ -9,6 +9,7 @@ import {
   users,
 } from "../../db/schema/users.js";
 import { successResponse, errorResponse } from "../../lib/response.js";
+import { euclideanDistance } from "../../config/euclideanDistance.js";
 
 // ==================== MARK TEACHER ATTENDANCE ====================
 export const markTeacherAttendance = async (req, res) => {
@@ -165,15 +166,18 @@ export const markTeacherAttendanceViaQR = async (req, res) => {
     }
 
     // Check if attendance already exists for this date
-    let existingAttendance = await db
+    let [existingAttendance] = await db
       .select()
       .from(teacherAttendance)
       .where(eq(teacherAttendance.date, date))
-      .limit(1);
-
+     
+    if(existingAttendance){
+      errorResponse(res,"Today's Attendance Aleardy Marked")
+    }
+    
     let attendanceId;
 
-    if (existingAttendance.length === 0) {
+    if (!existingAttendance) {
       // Create new attendance record
       const [newAttendance] = await db
         .insert(teacherAttendance)
@@ -273,6 +277,146 @@ export const markTeacherAttendanceViaQR = async (req, res) => {
     return errorResponse(
       res,
       error.message || "Failed to mark teacher attendance via QR",
+      500,
+    );
+  }
+};
+
+// ==================== MARK TEACHER ATTENDANCE VIA FACE====================
+export const markTeacherAttendanceViaFace = async (req, res) => {
+  try {
+    const { faceDescriptor } = req.body;
+    const markedBy = req.user?.id;
+
+    if (
+      !faceDescriptor ||
+      !Array.isArray(faceDescriptor) ||
+      faceDescriptor.length !== 128
+    ) {
+      return errorResponse(res, "Invalid face descriptor", 400);
+    }
+
+    if (!markedBy) {
+      return errorResponse(res, "User not authenticated", 401);
+    }
+
+    // ================= FIND TEACHER =================
+
+    const teachersList = await db
+      .select({
+        id: teachers.id,
+        name: teachers.name,
+        employeeId: teachers.employeeId,
+        profileImage: teachers.profileImage,
+        faceDescriptor: teachers.faceDescriptor,
+      })
+      .from(teachers);
+
+    let matchedTeacher = null;
+    let minDistance = Infinity;
+
+    for (const teacher of teachersList) {
+      if (!teacher.faceDescriptor) continue;
+
+      const distance = euclideanDistance(
+        faceDescriptor,
+        teacher.faceDescriptor,
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        matchedTeacher = teacher;
+      }
+    }
+
+    const FACE_THRESHOLD = 0.6;
+
+    if (!matchedTeacher || minDistance > FACE_THRESHOLD) {
+      return errorResponse(res, "Face not recognized", 404);
+    }
+
+    const teacherId = matchedTeacher.id;
+
+    const date = new Date().toISOString().split("T")[0];
+
+    // ================= ATTENDANCE =================
+
+    let [attendance] = await db
+      .select()
+      .from(teacherAttendance)
+      .where(eq(teacherAttendance.date, date))
+      .limit(1);
+
+    let attendanceId;
+
+    if (attendance) {
+      attendanceId = attendance.id;
+    } else {
+      attendanceId = uuidv4();
+
+      await db.insert(teacherAttendance).values({
+        id: attendanceId,
+        date,
+        markedBy,
+        markingMethod: "face",
+      });
+    }
+
+    // ================= DUPLICATE CHECK =================
+
+    const [existingLog] = await db
+      .select()
+      .from(teacherAttendanceLogs)
+      .where(
+        and(
+          eq(teacherAttendanceLogs.attendanceId, attendanceId),
+          eq(teacherAttendanceLogs.teacherId, teacherId),
+        ),
+      )
+      .limit(1);
+
+    if (existingLog) {
+      return errorResponse(res, "Attendance already marked", 200);
+    }
+
+    // ================= INSERT LOG =================
+
+    const logId = uuidv4();
+
+    await db.insert(teacherAttendanceLogs).values({
+      id: logId,
+      attendanceId,
+      teacherId,
+      status: "present",
+    });
+
+    const [newLog] = await db
+      .select()
+      .from(teacherAttendanceLogs)
+      .where(eq(teacherAttendanceLogs.id, logId))
+      .limit(1);
+
+    return successResponse(
+      res,
+      {
+        log: newLog,
+        teacher: {
+          id: matchedTeacher.id,
+          name: matchedTeacher.name,
+          employeeId: matchedTeacher.employeeId,
+          profileImage: matchedTeacher.profileImage,
+        },
+        faceDistance: Number(minDistance.toFixed(4)),
+      },
+      "Teacher attendance marked successfully",
+      201,
+    );
+  } catch (error) {
+    console.error(error);
+
+    return errorResponse(
+      res,
+      error.message || "Failed to mark teacher attendance",
       500,
     );
   }

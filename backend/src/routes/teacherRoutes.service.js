@@ -15,7 +15,8 @@ import {
   hardDeleteTeacher,
   updateTeacherStatus,
   getTeacherQRCode,
-  regenerateTeacherQRCode 
+  regenerateTeacherQRCode, 
+  addFaceDescriptor
 } from "../controllers/teacherController.service.js";
 import {
   authMiddleware,
@@ -86,6 +87,14 @@ teacherRouter.patch(
 );
 
 // ==================== GET ROUTES (Admin only) ====================
+
+teacherRouter.put(
+  "/face/:id",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  addFaceDescriptor,
+);
+
 teacherRouter.get(
   "/all",
   authMiddleware,
@@ -94,10 +103,11 @@ teacherRouter.get(
 );
 
 teacherRouter.get(
-  "/:id",
+  "/teacher/:id",
   authMiddleware,
   roleMiddleware(["super_admin", "admin"]),
   getTeacherById,
 );
+
 
 export default teacherRouter;

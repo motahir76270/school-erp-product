@@ -19,6 +19,7 @@ import {
   getStudentQRCode,
   regenerateStudentQRCode,
   scanStudentQRCode,
+  saveFaceDescriptor,
 } from "../controllers/studentController.service.js";
 import {
   authMiddleware,
@@ -83,6 +84,14 @@ studentRouter.put(
   roleMiddleware(["super_admin", "admin"]),
   updateStudentStatus,
 );
+
+studentRouter.put(
+  "/face/:id",
+  authMiddleware,
+  roleMiddleware(["super_admin", "admin"]),
+  saveFaceDescriptor,
+);
+
 
 // ==================== GET ROUTES (Admin & Teachers) ====================
 studentRouter.get(

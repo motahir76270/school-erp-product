@@ -1,4 +1,3 @@
-// app/dashboard/teachers/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/layout/page-header';
 import { Badge } from '@/components/ui/badge';
-import { Search, Trash2, User, RefreshCw, Edit2, MoreVertical, Plus, ChevronLeft, ChevronRight, QrCode, Eye, Key } from 'lucide-react';
+import { Search, Trash2, User, RefreshCw, Edit2, MoreVertical, Plus, ChevronLeft, ChevronRight, QrCode, Eye, Key, ScanFace } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,13 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,12 +32,9 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   getAllTeachersApiCall,
-  createTeacherApiCall,
   hardDeleteTeacherApiCall,
   updateTeacherStatusApiCall,
-  updateTeacherApiCall,
   getTeacherByIdApiCall,
-  resetTeacherPasswordApiCall,
   regenerateTeacherQRCodeApiCall,
   setTeachers,
   setLoading,
@@ -53,6 +42,13 @@ import {
 } from '@/store/slices/teacherSlice';
 import { toast } from 'react-toastify';
 import Image from 'next/image';
+import { EditTeacherModal } from '@/src/components/modal/teacher/EditTeacherModal';
+import { CreateTeacherModal } from '@/src/components/modal/teacher/CreateTeacherModal';
+import { ViewTeacherModal } from '@/src/components/modal/teacher/ViewTeacherModal';
+import { FaceScanModal } from '@/src/components/modal/teacher/FaceScanModal';
+import { ResetPasswordModal } from '@/src/components/modal/teacher/ResetPasswordModal';
+import { QRCodeModal } from '@/src/components/modal/teacher/QRCodeModal';
+
 
 interface Teacher {
   id: string;
@@ -81,75 +77,44 @@ interface Teacher {
 export default function TeachersPage() {
   const baseURl = process.env.NEXT_PUBLIC_BASE_URL_FILE;
   const dispatch = useAppDispatch();
-  const { teachers, loading, pagination } = useAppSelector((state:any) => state.teacher);
+  const { teachers, loading, pagination } = useAppSelector((state: any) => state.teacher);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
-  
-  // Create teacher form states
+
+  // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [form, setForm] = useState({
-    email: '',
-    password: '',
-    name: '',
-    username: '',
-    employeeId: '',
-    qualification: '',
-    experience: '',
-    specialization: '',
-    joiningDate: '',
-    salary: '',
-  });
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Edit teacher states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: '',
-    username: '',
-    qualification: '',
-    experience: '',
-    specialization: '',
-    salary: '',
-  });
-  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
-
-  // View teacher details
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [viewingTeacher, setViewingTeacher] = useState<Teacher | null>(null);
-
-  // Reset password
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
-  const [resetPasswordTeacherId, setResetPasswordTeacherId] = useState<string | null>(null);
-  const [resetPassword, setResetPassword] = useState('');
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
-
-  // QR Code modal
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isFaceScanModalOpen, setIsFaceScanModalOpen] = useState(false);
+
+  // Data states
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [viewingTeacher, setViewingTeacher] = useState<Teacher | null>(null);
+  const [resetPasswordTeacherId, setResetPasswordTeacherId] = useState<any>(null);
   const [qrCodeData, setQrCodeData] = useState<any>(null);
   const [isRegeneratingQR, setIsRegeneratingQR] = useState(false);
+  const [selectedTeacherForFaceScan, setSelectedTeacherForFaceScan] = useState<Teacher | null>(null);
 
   const fetchTeachers = async (page: number = currentPage) => {
     const token = localStorage.getItem('accessToken');
-    
+
     if (!token) {
       toast.error('No authentication token found');
       return;
     }
-    
+
     dispatch(setLoading(true));
     try {
       const data = await getAllTeachersApiCall(token, page, search, statusFilter);
       console.log('API Response:', data);
-      
+
       if (data?.success === true) {
         let teachersData = [];
         let paginationData = { page: 1, limit: 10, total: 0, totalPages: 0 };
-        
+
         if (data?.data?.teachers && Array.isArray(data.data.teachers)) {
           teachersData = data.data.teachers;
           paginationData = {
@@ -163,7 +128,7 @@ export default function TeachersPage() {
         } else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
           teachersData = [data.data];
         }
-        
+
         dispatch(setTeachers(teachersData));
         dispatch(setPagination(paginationData));
       } else {
@@ -181,18 +146,18 @@ export default function TeachersPage() {
 
   useEffect(() => {
     fetchTeachers(currentPage);
-  }, [search, currentPage, statusFilter,dispatch]);
+  }, [search, currentPage, statusFilter, dispatch]);
 
   const filteredTeachers = useMemo(() => {
     if (!teachers || !Array.isArray(teachers)) return [];
-    
+
     const query = search.toLowerCase().trim();
     if (!query) return teachers;
-    
+
     return teachers.filter((teacher: Teacher) => {
       const searchString = [
-        teacher.name, 
-        teacher.email, 
+        teacher.name,
+        teacher.email,
         teacher.employeeId,
         teacher.qualification || '',
         teacher.specialization || ''
@@ -203,67 +168,6 @@ export default function TeachersPage() {
     });
   }, [search, teachers]);
 
-  // Create Teacher
-  const handleCreateSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        setIsSubmitting(false);
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('email', form.email);
-      if (form.password) formData.append('password', form.password);
-      formData.append('name', form.name);
-      if (form.username) formData.append('username', form.username);
-      formData.append('employeeId', form.employeeId);
-      if (form.qualification) formData.append('qualification', form.qualification);
-      if (form.experience) formData.append('experience', form.experience);
-      if (form.specialization) formData.append('specialization', form.specialization);
-      formData.append('joiningDate', form.joiningDate);
-      if (form.salary) formData.append('salary', form.salary);
-      if (avatarFile) formData.append('profileImage', avatarFile);
-
-      const data = await createTeacherApiCall(token, formData);
-
-      if (data?.success === true) {
-        toast.success(data?.message || 'Teacher created successfully');
-        if (data?.data?.defaultUsername) {
-          toast.info(`Username: ${data.data.defaultUsername}`);
-        }
-        if (data?.data?.defaultPassword) {
-          toast.info(`Default Password: ${data.data.defaultPassword}`);
-        }
-        setForm({
-          email: '',
-          password: '',
-          name: '',
-          username: '',
-          employeeId: '',
-          qualification: '',
-          experience: '',
-          specialization: '',
-          joiningDate: '',
-          salary: '',
-        });
-        setAvatarFile(null);
-        setIsCreateModalOpen(false);
-        await fetchTeachers(currentPage);
-      } else {
-        toast.error(data?.message || 'Failed to create teacher');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to create teacher');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   // Delete Teacher
   const handleDelete = async (teacherId: string) => {
     const token = localStorage.getItem('accessToken');
@@ -271,7 +175,7 @@ export default function TeachersPage() {
       toast.error('No authentication token found');
       return;
     }
-    
+
     if (!confirm('Are you sure you want to permanently delete this teacher?')) {
       return;
     }
@@ -312,177 +216,35 @@ export default function TeachersPage() {
 
   // Open edit modal
   const handleEditClick = async (teacher: Teacher) => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      toast.error('No authentication token found');
-      return;
-    }
-
-    try {
-      const data = await getTeacherByIdApiCall(token, teacher.id);
-      if (data?.success === true) {
-        const teacherData = data.data.teacher;
-        setEditingTeacher(teacherData);
-        setEditForm({
-          name: teacherData.name,
-          username: teacherData.username || '',
-          qualification: teacherData.qualification || '',
-          experience: teacherData.experience || '',
-          specialization: teacherData.specialization || '',
-          salary: teacherData.salary || '',
-        });
-        setCurrentAvatar(teacherData.profileImage);
-        setEditAvatarFile(null);
+        setEditingTeacher(teacher);
         setIsEditModalOpen(true);
-      } else {
-        toast.error(data?.message || 'Failed to fetch teacher details');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to fetch teacher details');
-    }
-  };
-
-  // Handle edit form submission
-  const handleEditSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!editingTeacher) return;
-    
-    setIsEditSubmitting(true);
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        setIsEditSubmitting(false);
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('name', editForm.name);
-      if (editForm.username) formData.append('username', editForm.username);
-      if (editForm.qualification) formData.append('qualification', editForm.qualification);
-      if (editForm.experience) formData.append('experience', editForm.experience);
-      if (editForm.specialization) formData.append('specialization', editForm.specialization);
-      if (editForm.salary) formData.append('salary', editForm.salary);
-      if (editAvatarFile) formData.append('profileImage', editAvatarFile);
-
-      const data = await updateTeacherApiCall(token, editingTeacher.id, formData);
-
-      if (data?.success === true) {
-        toast.success(data?.message || 'Teacher updated successfully');
-        setIsEditModalOpen(false);
-        setEditingTeacher(null);
-        setEditAvatarFile(null);
-        setCurrentAvatar(null);
-        await fetchTeachers(currentPage);
-      } else {
-        toast.error(data?.message || 'Failed to update teacher');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update teacher');
-    } finally {
-      setIsEditSubmitting(false);
-    }
   };
 
   // View Teacher
   const handleViewClick = async (teacher: Teacher) => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      toast.error('No authentication token found');
-      return;
-    }
-
-    try {
-      const data = await getTeacherByIdApiCall(token, teacher.id);
-      if (data?.success === true) {
-        setViewingTeacher(data.data.teacher);
+        setViewingTeacher(teacher);
         setIsViewModalOpen(true);
-      } else {
-        toast.error(data?.message || 'Failed to fetch teacher details');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to fetch teacher details');
-    }
   };
 
   // Reset Password
-  const handleResetPassword = async (teacherId: string) => {
+  const handleResetPassword = (teacherId: string) => {
     setResetPasswordTeacherId(teacherId);
-    setResetPassword('');
     setIsResetPasswordModalOpen(true);
   };
 
-  const handleResetPasswordSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!resetPasswordTeacherId) return;
-    
-    setIsResettingPassword(true);
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        setIsResettingPassword(false);
-        return;
-      }
-
-      const data = await resetTeacherPasswordApiCall(
-        token, 
-        resetPasswordTeacherId, 
-        resetPassword || undefined
-      );
-
-      if (data?.success === true) {
-        toast.success(data?.message || 'Password reset successfully');
-        if (data?.data?.newPassword) {
-          toast.info(`New password: ${data.data.newPassword}`);
-        }
-        setIsResetPasswordModalOpen(false);
-        setResetPasswordTeacherId(null);
-        setResetPassword('');
-      } else {
-        toast.error(data?.message || 'Failed to reset password');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to reset password');
-    } finally {
-      setIsResettingPassword(false);
-    }
-  };
-
-  // View QR Code
-  const handleViewQR = async (teacher: Teacher) => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      toast.error('No authentication token found');
-      return;
-    }
-
-    try {
-      const data = await getTeacherByIdApiCall(token, teacher.id);
-      if (data?.success === true) {
-        const teacherData = data.data.teacher;
-        if (teacherData.qrCode) {
-          const qrCodeUrl = `${baseURl}${teacherData.qrCode}`;
-          setQrCodeData({
-            qrCode: teacherData.qrCode,
-            qrCodeUrl: qrCodeUrl,
-          });
-          setIsQRModalOpen(true);
-        } else {
-          toast.info('No QR code found for this teacher');
-        }
-      } else {
-        toast.error(data?.message || 'Failed to fetch teacher details');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to fetch teacher details');
+  // View QR Code - FIXED: No API call needed, use existing teacher data
+  const handleViewQR = (teacher: Teacher) => {
+    if (teacher.qrCode) {
+      const qrCodeUrl = `${baseURl}${teacher.qrCode}`;
+      setQrCodeData(qrCodeUrl);
+      setIsQRModalOpen(true);
+    } else {
+      toast.info('No QR code found for this teacher');
     }
   };
 
   // Regenerate QR Code
-  const handleRegenerateQR = async (teacherId: string) => {
+  const handleRegenerateQR = async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
       toast.error('No authentication token found');
@@ -495,7 +257,10 @@ export default function TeachersPage() {
       if (data?.success === true) {
         toast.success(data?.message || 'QR code regenerated successfully');
         if (data?.data) {
-          setQrCodeData(data.data);
+          setQrCodeData({
+            qrCode: data.data.qrCode,
+            qrCodeUrl: `${baseURl}${data.data.qrCode}`,
+          });
         }
         await fetchTeachers(currentPage);
       } else {
@@ -508,22 +273,10 @@ export default function TeachersPage() {
     }
   };
 
-  // Reset create form modal
-  const resetCreateForm = () => {
-    setForm({
-      email: '',
-      password: '',
-      name: '',
-      username: '',
-      employeeId: '',
-      qualification: '',
-      experience: '',
-      specialization: '',
-      joiningDate: '',
-      salary: '',
-    });
-    setAvatarFile(null);
-    setIsCreateModalOpen(false);
+  // Open Face Scan modal
+  const handleFaceScanClick = (teacher: Teacher) => {
+    setSelectedTeacherForFaceScan(teacher);
+    setIsFaceScanModalOpen(true);
   };
 
   // Pagination handlers
@@ -547,7 +300,7 @@ export default function TeachersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Teachers" description="Manage teacher accounts and profiles." />
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -594,7 +347,7 @@ export default function TeachersPage() {
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -648,7 +401,7 @@ export default function TeachersPage() {
                       <TableCell>{teacher.email}</TableCell>
                       <TableCell>{teacher.specialization || 'N/A'}</TableCell>
                       <TableCell>
-                        <Badge 
+                        <Badge
                           variant={getStatusBadgeVariant(teacher.isActive)}
                           className="cursor-pointer"
                           onClick={() => {
@@ -675,6 +428,10 @@ export default function TeachersPage() {
                               <Edit2 className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleFaceScanClick(teacher)}>
+                              <ScanFace className="mr-2 h-4 w-4" />
+                              Face Scan Attendance
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleResetPassword(teacher.id)}>
                               <Key className="mr-2 h-4 w-4" />
                               Reset Password
@@ -683,7 +440,7 @@ export default function TeachersPage() {
                               <QrCode className="mr-2 h-4 w-4" />
                               View QR Code
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 const newStatus = teacher.isActive ? 'inactive' : 'active';
                                 handleStatusChange(teacher.id, newStatus as 'active' | 'inactive');
@@ -692,7 +449,7 @@ export default function TeachersPage() {
                             >
                               {teacher.isActive ? 'Deactivate' : 'Activate'}
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleDelete(teacher.id)}
                               className="text-destructive"
                             >
@@ -740,431 +497,69 @@ export default function TeachersPage() {
         </CardContent>
       </Card>
 
-      {/* Create Teacher Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Teacher</DialogTitle>
-            <DialogDescription>
-              Add a new teacher to the platform. All fields marked with * are required.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="Leave empty for default (123456)"
-                  minLength={6}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
-                  placeholder="Auto-generated if left empty"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="employeeId">Employee ID <span className="text-destructive">*</span></Label>
-                <Input
-                  id="employeeId"
-                  value={form.employeeId}
-                  onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="joiningDate">Joining Date <span className="text-destructive">*</span></Label>
-                <Input
-                  id="joiningDate"
-                  type="date"
-                  value={form.joiningDate}
-                  onChange={(e) => setForm({ ...form, joiningDate: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="qualification">Qualification</Label>
-                <Input
-                  id="qualification"
-                  value={form.qualification}
-                  onChange={(e) => setForm({ ...form, qualification: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="experience">Experience (years)</Label>
-                <Input
-                  id="experience"
-                  value={form.experience}
-                  onChange={(e) => setForm({ ...form, experience: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="specialization">Specialization</Label>
-                <Input
-                  id="specialization"
-                  value={form.specialization}
-                  onChange={(e) => setForm({ ...form, specialization: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary">Salary</Label>
-                <Input
-                  id="salary"
-                  value={form.salary}
-                  onChange={(e) => setForm({ ...form, salary: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="avatar">Profile image</Label>
-              <Input
-                id="avatar"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-              />
-              {avatarFile && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {avatarFile.name}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={resetCreateForm}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Teacher'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Modals */}
+      <CreateTeacherModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => fetchTeachers(currentPage)}
+      />
 
-      {/* Edit Teacher Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Teacher</DialogTitle>
-            <DialogDescription>
-              Update teacher information. Upload a new image to change the profile picture.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">Full Name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-name"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-username">Username</Label>
-                <Input
-                  id="edit-username"
-                  value={editForm.username}
-                  onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="edit-qualification">Qualification</Label>
-                <Input
-                  id="edit-qualification"
-                  value={editForm.qualification}
-                  onChange={(e) => setEditForm({ ...editForm, qualification: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-experience">Experience (years)</Label>
-                <Input
-                  id="edit-experience"
-                  value={editForm.experience}
-                  onChange={(e) => setEditForm({ ...editForm, experience: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="edit-specialization">Specialization</Label>
-                <Input
-                  id="edit-specialization"
-                  value={editForm.specialization}
-                  onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-salary">Salary</Label>
-                <Input
-                  id="edit-salary"
-                  value={editForm.salary}
-                  onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-avatar">Profile image</Label>
-              <Input
-                id="edit-avatar"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setEditAvatarFile(e.target.files?.[0] || null)}
-              />
-              {currentAvatar && !editAvatarFile && (
-                <div className="flex items-center gap-2">
-                  <Image
-                    src={`${baseURl}/${currentAvatar}`}
-                    alt="Current profile"
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Current: {currentAvatar.split('/').pop()}
-                  </p>
-                </div>
-              )}
-              {editAvatarFile && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {editAvatarFile.name}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingTeacher(null);
-                  setEditAvatarFile(null);
-                  setCurrentAvatar(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={isEditSubmitting}>
-                {isEditSubmitting ? 'Updating...' : 'Update Teacher'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditTeacherModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingTeacher(null);
+        }}
+        onSuccess={() => fetchTeachers(currentPage)}
+        teacher={editingTeacher}
+        baseUrl={baseURl}
+      />
 
-      {/* View Teacher Modal */}
-      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Teacher Details</DialogTitle>
-            <DialogDescription>
-              Complete information about the teacher.
-            </DialogDescription>
-          </DialogHeader>
-          {viewingTeacher && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted overflow-hidden">
-                  {viewingTeacher.profileImage ? (
-                    <Image
-                      src={`${baseURl}${viewingTeacher.profileImage}`}
-                      alt={viewingTeacher.name}
-                      width={80}
-                      height={80}
-                      className="h-20 w-20 rounded-full object-cover"
-                    />
-                  ) : (
-                    <User className="h-10 w-10" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">{viewingTeacher.name}</h3>
-                  <p className="text-sm text-muted-foreground">{viewingTeacher.email}</p>
-                  <Badge variant={getStatusBadgeVariant(viewingTeacher.isActive)}>
-                    {viewingTeacher.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Employee ID</p>
-                  <p className="font-medium">{viewingTeacher.employeeId}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Username</p>
-                  <p className="font-medium">{viewingTeacher.username}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Qualification</p>
-                  <p className="font-medium">{viewingTeacher.qualification || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Experience</p>
-                  <p className="font-medium">{viewingTeacher.experience || 'N/A'} years</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Specialization</p>
-                  <p className="font-medium">{viewingTeacher.specialization || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Salary</p>
-                  <p className="font-medium">{viewingTeacher.salary || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Joining Date</p>
-                  <p className="font-medium">{new Date(viewingTeacher.joiningDate).toLocaleDateString()}</p>
-                </div>
-                {viewingTeacher.qrCode && (
-                  <div className="col-span-2">
-                    <p className="text-sm text-muted-foreground">QR Code</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-1"
-                      onClick={() => {
-                        const qrCodeUrl = `${baseURl}${viewingTeacher.qrCode}`;
-                        setQrCodeData({
-                          qrCode: viewingTeacher.qrCode,
-                          qrCodeUrl: qrCodeUrl,
-                        });
-                        setIsQRModalOpen(true);
-                      }}
-                    >
-                      <QrCode className="h-4 w-4 mr-2" />
-                      View QR Code
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ViewTeacherModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setViewingTeacher(null);
+        }}
+        teacher={viewingTeacher}
+        baseUrl={baseURl}
+        onViewQR={handleViewQR}
+      />
 
-      {/* Reset Password Modal */}
-      <Dialog open={isResetPasswordModalOpen} onOpenChange={setIsResetPasswordModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Reset Teacher Password</DialogTitle>
-            <DialogDescription>
-              Enter a new password or leave empty to use the default password (123456).
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reset-password">New Password</Label>
-              <Input
-                id="reset-password"
-                type="password"
-                value={resetPassword}
-                onChange={(e) => setResetPassword(e.target.value)}
-                placeholder="Leave empty for default (123456)"
-                minLength={6}
-              />
-            </div>
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setIsResetPasswordModalOpen(false);
-                  setResetPasswordTeacherId(null);
-                  setResetPassword('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={isResettingPassword}>
-                {isResettingPassword ? 'Resetting...' : 'Reset Password'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <ResetPasswordModal
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => {
+          setIsResetPasswordModalOpen(false);
+          setResetPasswordTeacherId(null);
+        }}
+        teacherId={resetPasswordTeacherId}
+        onSuccess={() => fetchTeachers(currentPage)}
+      />
 
-      {/* QR Code Modal */}
-      <Dialog open={isQRModalOpen} onOpenChange={setIsQRModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Teacher QR Code</DialogTitle>
-            <DialogDescription>
-              Scan this QR code to access teacher information.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center space-y-4 py-4">
-            {qrCodeData && (
-              <>
-                <div className="relative w-48 h-48 bg-white rounded-lg overflow-hidden">
-                  <Image
-                    src={qrCodeData.qrCodeUrl}
-                    alt="Teacher QR Code"
-                    fill
-                    className="object-contain p-2"
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    if (viewingTeacher) {
-                      await handleRegenerateQR(viewingTeacher.id);
-                    }
-                  }}
-                  disabled={isRegeneratingQR}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isRegeneratingQR ? 'animate-spin' : ''}`} />
-                  Regenerate QR Code 
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <QRCodeModal
+        isOpen={isQRModalOpen}
+        onClose={() => {
+          setIsQRModalOpen(false);
+          setQrCodeData(null);
+        }}
+        qrCodeData={qrCodeData}
+        onRegenerate={handleRegenerateQR}
+        isRegenerating={isRegeneratingQR}
+      />
+
+      <FaceScanModal
+        isOpen={isFaceScanModalOpen}
+        onClose={() => {
+          setIsFaceScanModalOpen(false);
+          setSelectedTeacherForFaceScan(null);
+        }}
+        teacherId={selectedTeacherForFaceScan?.id}
+        teacherName={selectedTeacherForFaceScan?.name}
+        onSuccess={(data: any) => {
+          console.log('Attendance marked:', data);
+          // Optionally refresh data or show additional notifications
+        }}
+      />
     </div>
   );
 }

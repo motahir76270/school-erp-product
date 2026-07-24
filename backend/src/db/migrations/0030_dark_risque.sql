@@ -1,0 +1,1 @@
+ALTER TABLE `teachers` ADD `face_descriptor` json;

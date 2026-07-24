@@ -157,6 +157,20 @@ export const markTeacherAttendanceViaQRApiCall = async (token: any, payload: any
   }
 };
 
+// Mark Teacher Attendance via QR Code
+export const markTeacherAttendanceViaFAceScanApiCall = async (token: any, faceDescriptor: any) => {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE_URL}/teacher/mark-face`,
+      {faceDescriptor},
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
 // Get Teacher Attendance by Date
 export const getTeacherAttendanceByDateApiCall = async (token: any, params: any) => {
   try {

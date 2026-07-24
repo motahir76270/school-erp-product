@@ -209,6 +209,17 @@ export const updateTeacherApiCall = async (token: string, teacherId: string, tea
   return data;
 };
 
+// Update Teacher (Admin)
+export const addFaceTeacherApiCall = async (token: string, teacherId:any,faceDescriptor:any) => {
+  const { data } = await axios.put(`${API_URL}/face/${teacherId}`, {faceDescriptor},{
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  return data;
+};
+
 // Update Teacher Profile (Self)
 export const updateTeacherProfileApiCall = async (token: string, teacherData: FormData) => {
   const { data } = await axios.put(`${API_URL}/profile`, teacherData, {

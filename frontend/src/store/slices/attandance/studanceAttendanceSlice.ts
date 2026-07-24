@@ -220,6 +220,23 @@ export const markAttendanceViaQRApiCall = async (
   }
 };
 
+// Mark Attendance via QR Face
+export const markAttendanceViaFaceApiCall = async (
+  token: string,
+  faceDescriptor:any
+) => {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE_URL}/student/mark-face`,
+      {faceDescriptor},
+      getHeaders(token)
+    );
+    return data;
+  } catch (error: any) {
+    return handleApiError(error);
+  }
+};
+
 // Get Attendance by Date
 export const getAttendanceByDateApiCall = async (
   token: string,

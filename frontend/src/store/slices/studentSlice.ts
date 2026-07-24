@@ -4,93 +4,9 @@ import axios from 'axios';
 
 const API_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/students`;
 
-// Types
-export interface Student {
-  id: string;
-  userId: string | null;
-  username: string;
-  email: string;
-  password: string;
-  role: 'student';
-  name: string;
-  phone: string | null;
-  address: string | null;
-  profileImage: string | null;
-  rollNumber: string;
-  admissionNumber: string | null;
-  classId: string;
-  sectionId: string | null;
-  dateOfBirth: string | null;
-  gender: 'male' | 'female' | 'other' | null;
-  bloodGroup: string | null;
-  religion: string | null;
-  caste: string | null;
-  nationality: string | null;
-  aadharNumber: string | null;
-  admissionDate: string;
-  qrCode: string | null;
-  status: 'active' | 'inactive' | 'suspended';
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string | null;
-}
-
-export interface CreateStudentData {
-  email: string;
-  password?: string;
-  name: string;
-  phone?: string;
-  address?: string;
-  username?: string;
-  rollNumber: string;
-  admissionNumber?: string;
-  classId: string;
-  sectionId?: string;
-  dateOfBirth?: string;
-  gender?: 'male' | 'female' | 'other';
-  profileImage?: string;
-  bloodGroup?: string;
-  religion?: string;
-  caste?: string;
-  nationality?: string;
-  aadharNumber?: string;
-  admissionDate: string;
-}
-
-export interface UpdateStudentData {
-  name?: string;
-  phone?: string;
-  address?: string;
-  username?: string;
-  rollNumber?: string;
-  admissionNumber?: string;
-  classId?: string;
-  sectionId?: string;
-  dateOfBirth?: string;
-  gender?: 'male' | 'female' | 'other';
-  bloodGroup?: string;
-  religion?: string;
-  caste?: string;
-  nationality?: string;
-  aadharNumber?: string;
-  status?: 'active' | 'inactive' | 'suspended';
-}
-
-export interface StudentState {
-  students: Student[];
-  currentStudent: Student | null;
-  loading: boolean;
-  error: string | null;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-  };
-}
 
 // Initial State
-const initialState: StudentState = {
+const initialState = {
   students: [],
   currentStudent: null,
   loading: false,
@@ -110,16 +26,16 @@ const studentSlice = createSlice({
     setStudents: (state, action) => {
       state.students = action.payload;
     },
-    setCurrentStudent: (state, action: PayloadAction<Student | null>) => {
+    setCurrentStudent: (state, action) => {
       state.currentStudent = action.payload;
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
+    setLoading: (state, action) => {
       state.loading = action.payload;
     },
-    setError: (state, action: PayloadAction<string | null>) => {
+    setError: (state, action) => {
       state.error = action.payload;
     },
-    setPagination: (state, action: PayloadAction<{ page: number; limit: number; total: number }>) => {
+    setPagination: (state, action) => {
       state.pagination = action.payload;
     },
     clearStudents: (state) => {
@@ -131,17 +47,17 @@ const studentSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    addStudent: (state, action: PayloadAction<Student>) => {
-      state.students.unshift(action.payload);
+    addStudent: (state, action) => {
+      state.students = action.payload
     },
-    updateStudentInList: (state, action: PayloadAction<Student>) => {
-      const index = state.students.findIndex((s) => s.id === action.payload.id);
+    updateStudentInList: (state:any, action) => {
+      const index = state.students.findIndex((s:any) => s.id === action.payload.id);
       if (index !== -1) {
         state.students[index] = action.payload;
       }
     },
-    removeStudentFromList: (state, action: PayloadAction<string>) => {
-      state.students = state.students.filter((s) => s.id !== action.payload);
+    removeStudentFromList: (state, action) => {
+      state.students = state.students.filter((s:any) => s.id !== action.payload);
     },
   },
 });
@@ -230,6 +146,18 @@ export const updateStudentProfileApiCall = async (token: string, studentData: Fo
   });
   return data;
 };
+
+// add or update studnet faceDesctrotor or face regognige
+export const addOrUpdateStudentFaceDescriptorApiCall = async (token: any, id:any, faceDescriptor:any) => {
+  const { data } = await axios.put(`${API_URL}/face/${id}`, {faceDescriptor}, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  return data;
+};
+
 
 // Delete Student (Soft Delete)
 export const deleteStudentApiCall = async (token: string) => {

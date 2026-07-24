@@ -10,6 +10,7 @@ import {
   deleteTeacherAttendance,
   getTodayTeacherAttendance,
   getTeacherAttendanceStatistics,
+  markTeacherAttendanceViaFace,
 } from "../../controllers/attendance/teacherAttendanceController.service.js";
 
 import { authMiddleware } from "../../middleware/authMiddleware.js";
@@ -17,7 +18,12 @@ import { authMiddleware } from "../../middleware/authMiddleware.js";
 const teacherAttendanceRouter = express.Router();
 // Mark attendance
 teacherAttendanceRouter.post("/teacher/mark",authMiddleware, markTeacherAttendance);
-teacherAttendanceRouter.post("/teacher/mark-qr",authMiddleware, markTeacherAttendanceViaQR);
+teacherAttendanceRouter.post("/teacher/mark-face",authMiddleware, markTeacherAttendanceViaQR);
+teacherAttendanceRouter.post(
+  "/teacher/mark-qr",
+  authMiddleware,
+  markTeacherAttendanceViaFace,
+);
 
 // Get attendance
 teacherAttendanceRouter.get("/teacher/date",authMiddleware, getTeacherAttendanceByDate);

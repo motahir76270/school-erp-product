@@ -33,6 +33,7 @@ import { getAllTeachersApiCall, setTeachers, setPagination } from '@/store/slice
 import { ManualAttendanceTab } from '@/src/components/admin/tecaherAttendace/ManualAttendanceTab';
 import { QRScanAttendanceTab } from '@/src/components/admin/tecaherAttendace/QRScanAttendanceTab';
 import { AttendanceHistoryTab } from '@/src/components/admin/tecaherAttendace/AttendanceHistoryTab';
+import FaceScanAttendanceTab from '@/src/components/admin/tecaherAttendace/faceScanAttendanceTab';
 
 
 
@@ -250,7 +251,7 @@ export default function TeacherAttendancePage() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4 md-grid-cols-2 sm-grid-cols-1">
               <TabsTrigger value="manual" className="flex items-center gap-2">
                 <UserCheck className="h-4 w-4" />
                 Manual Attendance
@@ -258,6 +259,10 @@ export default function TeacherAttendancePage() {
               <TabsTrigger value="qr" className="flex items-center gap-2">
                 <QrCode className="h-4 w-4" />
                 QR Code
+              </TabsTrigger>
+              <TabsTrigger value="face" className="flex items-center gap-2">
+                <QrCode className="h-4 w-4" />
+                Face Scan
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
                 <History className="h-4 w-4" />
@@ -279,6 +284,10 @@ export default function TeacherAttendancePage() {
                 loading={attendanceLoading}
                 onQRSubmit={handleQRAttendance}
               />
+            </TabsContent>
+
+            <TabsContent value="face" className="mt-6">
+              <FaceScanAttendanceTab/>
             </TabsContent>
 
             <TabsContent value="history" className="mt-6">

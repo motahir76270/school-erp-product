@@ -8,6 +8,7 @@ import {
   students,
 } from "../../db/schema/users.js";
 import { successResponse, errorResponse } from "../../lib/response.js";
+import { euclideanDistance } from "../../config/euclideanDistance.js";
 
 // ==================== MARK ATTENDANCE ====================
 export const markAttendance = async (req, res) => {
@@ -77,7 +78,7 @@ export const markAttendance = async (req, res) => {
         markedBy: markedBy,
         markingMethod: markingMethod,
       })
-      .returning();
+
 
     if (!newAttendance) {
       return errorResponse(res, "Failed to create attendance record", 500);
@@ -94,7 +95,7 @@ export const markAttendance = async (req, res) => {
     const insertedLogs = await db
       .insert(studentAttendanceLogs)
       .values(attendanceLogsData)
-      .returning();
+
 
     // Get student details for response
     const logsWithStudents = await Promise.all(
@@ -166,7 +167,7 @@ export const markAttendanceViaQR = async (req, res) => {
     }
 
     // Check if attendance already exists for this date
-    let existingAttendance = await db
+    let [existingAttendance] = await db
       .select()
       .from(studentAttendance)
       .where(
@@ -178,7 +179,6 @@ export const markAttendanceViaQR = async (req, res) => {
             : eq(studentAttendance.sectionId, null),
         ),
       )
-      .limit(1);
 
     let attendanceId;
 
@@ -194,18 +194,18 @@ export const markAttendanceViaQR = async (req, res) => {
           markedBy: markedBy,
           markingMethod: "qrcode",
         })
-        .returning();
+      
 
       if (!newAttendance) {
         return errorResponse(res, "Failed to create attendance record", 500);
       }
       attendanceId = newAttendance.id;
     } else {
-      attendanceId = existingAttendance[0].id;
+      attendanceId = existingAttendance.id;
     }
 
     // Check if student already marked attendance for this date
-    const existingLog = await db
+    const [existingLog] = await db
       .select()
       .from(studentAttendanceLogs)
       .where(
@@ -214,7 +214,7 @@ export const markAttendanceViaQR = async (req, res) => {
           eq(studentAttendanceLogs.studentId, studentId),
         ),
       )
-      .limit(1);
+
 
     if (existingLog.length > 0) {
       // Update existing log
@@ -224,8 +224,8 @@ export const markAttendanceViaQR = async (req, res) => {
           status: "present",
           markedAt: new Date(),
         })
-        .where(eq(studentAttendanceLogs.id, existingLog[0].id))
-        .returning();
+        .where(eq(studentAttendanceLogs.id, existingLog.id))
+  
 
       return successResponse(
         res,
@@ -252,7 +252,6 @@ export const markAttendanceViaQR = async (req, res) => {
         studentId: studentId,
         status: "present",
       })
-      .returning();
 
     if (!newLog) {
       return errorResponse(res, "Failed to mark attendance via QR", 500);
@@ -289,6 +288,213 @@ export const markAttendanceViaQR = async (req, res) => {
   }
 };
 
+// ==================== MARK ATTENDANCE VIA FACE ====================
+export const markAttendanceViaFace = async (req, res) => {
+  try {
+    const { faceDescriptor } = req.body;
+    const markedBy = req.user?.id;
+
+    if (
+      !faceDescriptor ||
+      !Array.isArray(faceDescriptor) ||
+      faceDescriptor.length !== 128
+    ) {
+      return errorResponse(res, "Invalid face descriptor", 400);
+    }
+
+
+    if (!markedBy) {
+      return errorResponse(res, "User not authenticated", 401);
+    }
+
+
+
+    // ================= FACE MATCH =================
+
+    const studentsList = await db
+      .select({
+        id: students.id,
+        name: students.name,
+        rollNumber: students.rollNumber,
+        classId: students.classId,
+        sectionId: students.sectionId,
+        faceDescriptor: students.faceDescriptor,
+        profileImage: students.profileImage,
+      })
+      .from(students);
+
+
+
+    let matchedStudent = null;
+    let minDistance = Infinity;
+
+
+    for (const student of studentsList) {
+
+      if (!student.faceDescriptor) continue;
+
+
+      const distance = euclideanDistance(
+        faceDescriptor,
+        student.faceDescriptor,
+      );
+
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        matchedStudent = student;
+      }
+    }
+
+
+
+    const FACE_THRESHOLD = 0.6;
+
+
+    if (!matchedStudent || minDistance > FACE_THRESHOLD) {
+      return errorResponse(res, "Face not recognized", 404);
+    }
+
+
+
+    const studentId = matchedStudent.id;
+    const classId = matchedStudent.classId;
+    const sectionId = matchedStudent.sectionId || null;
+
+
+    const date = new Date()
+      .toISOString()
+      .split("T")[0];
+
+
+
+    // ================= ATTENDANCE =================
+
+
+    const [existingAttendance] = await db
+      .select()
+      .from(studentAttendance)
+      .where(
+        and(
+          eq(studentAttendance.date, date),
+          eq(studentAttendance.classId, classId),
+          sectionId
+            ? eq(studentAttendance.sectionId, sectionId)
+            : isNull(studentAttendance.sectionId),
+        ),
+      )
+      .limit(1);
+
+
+
+    let attendanceId;
+
+
+
+    if (existingAttendance) {
+
+      attendanceId = existingAttendance.id;
+
+    } else {
+
+      attendanceId = uuidv4();
+
+
+      await db.insert(studentAttendance).values({
+        id: attendanceId,
+        date,
+        classId,
+        sectionId,
+        markedBy,
+        markingMethod: "face",
+      });
+
+    }
+
+
+
+
+    // ================= DUPLICATE CHECK =================
+
+
+    const [existingLog] = await db
+      .select()
+      .from(studentAttendanceLogs)
+      .where(
+        and(
+          eq(studentAttendanceLogs.attendanceId, attendanceId),
+          eq(studentAttendanceLogs.studentId, studentId),
+        ),
+      )
+
+
+    if (existingLog) {
+
+      return errorResponse(
+        res,
+        "Attendance already marked",
+        200,
+      );
+
+    }
+
+
+
+    // ================= CREATE LOG =================
+
+
+    const logId = uuidv4();
+
+
+    await db.insert(studentAttendanceLogs).values({
+      id: logId,
+      attendanceId,
+      studentId,
+      status: "present",
+    });
+
+
+
+    const [newLog] = await db
+      .select()
+      .from(studentAttendanceLogs)
+      .where(eq(studentAttendanceLogs.id, logId))
+      .limit(1);
+
+
+
+    return successResponse(
+      res,
+      {
+        log: newLog,
+        student: {
+          id: matchedStudent.id,
+          name: matchedStudent.name,
+          rollNumber: matchedStudent.rollNumber,
+          profileImage: matchedStudent.profileImage
+        },
+        faceDistance: Number(minDistance.toFixed(4)),
+      },
+      "Attendance marked via face successfully",
+      201,
+    );
+
+
+  } catch (error) {
+
+    console.error("Mark attendance via face error:", error);
+
+
+    return errorResponse(
+      res,
+      error.message || "Failed to mark attendance via face",
+      500,
+    );
+
+  }
+};
+
+
 // ==================== GET ATTENDANCE BY DATE ====================
 export const getAttendanceByDate = async (req, res) => {
   try {
@@ -298,7 +504,7 @@ export const getAttendanceByDate = async (req, res) => {
       return errorResponse(res, "Date and classId are required", 400);
     }
 
-    let attendanceRecords = await db
+    let [attendanceRecords] = await db
       .select()
       .from(studentAttendance)
       .where(
@@ -311,7 +517,7 @@ export const getAttendanceByDate = async (req, res) => {
         ),
       );
 
-    if (attendanceRecords.length === 0) {
+    if (attendanceRecords) {
       return successResponse(
         res,
         {
@@ -324,7 +530,7 @@ export const getAttendanceByDate = async (req, res) => {
       );
     }
 
-    const attendanceId = attendanceRecords[0].id;
+    const attendanceId = attendanceRecords.id;
 
     // Get attendance logs with student details
     const logs = await db
@@ -345,7 +551,7 @@ export const getAttendanceByDate = async (req, res) => {
     return successResponse(
       res,
       {
-        attendance: attendanceRecords[0],
+        attendance: attendanceRecords,
         logs: logs,
         totalStudents: logs.length,
       },
@@ -478,7 +684,7 @@ export const updateAttendanceStatus = async (req, res) => {
         markedAt: new Date(),
       })
       .where(eq(studentAttendanceLogs.id, logId))
-      .returning();
+  
 
     if (!updatedLog) {
       return errorResponse(res, "Failed to update attendance status", 500);
@@ -676,7 +882,7 @@ export const getTodayAttendance = async (req, res) => {
       return errorResponse(res, "Class ID is required", 400);
     }
 
-    const attendanceRecords = await db
+    const [attendanceRecords] = await db
       .select()
       .from(studentAttendance)
       .where(
@@ -702,7 +908,7 @@ export const getTodayAttendance = async (req, res) => {
       );
     }
 
-    const attendanceId = attendanceRecords[0].id;
+    const attendanceId = attendanceRecords.id;
 
     const logs = await db
       .select({
@@ -738,7 +944,7 @@ export const getTodayAttendance = async (req, res) => {
     return successResponse(
       res,
       {
-        attendance: attendanceRecords[0],
+        attendance: attendanceRecords,
         logs: logs,
         unmarkedStudents: unmarkedStudents.map((s) => ({
           id: s.id,

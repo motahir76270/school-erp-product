@@ -1135,3 +1135,58 @@ export const scanStudentQRCode = async (req, res) => {
     return errorResponse(res, error.message || "Failed to scan QR code", 500);
   }
 };
+
+
+// ==================== SAVE FACE DESCRIPTOR ====================
+export const saveFaceDescriptor = async (req, res) => {
+  try {
+    const studentId =  req.params.id || req.user?.id;
+
+    if (!studentId) {
+      return errorResponse(res, "Student not authenticated", 401);
+    }
+
+    const { faceDescriptor } = req.body;
+
+    if (
+      !faceDescriptor ||
+      !Array.isArray(faceDescriptor) ||
+      faceDescriptor.length !== 128
+    ) {
+      return errorResponse(res, "Invalid face descriptor", 400);
+    }
+
+    const [student] = await db
+      .select()
+      .from(students)
+      .where(eq(students.id, studentId))
+      .limit(1);
+
+    if (!student) {
+      return errorResponse(res, "Student not found", 404);
+    }
+
+    await db
+      .update(students)
+      .set({
+        faceDescriptor,
+        updatedAt: new Date(),
+      })
+      .where(eq(students.id, studentId));
+
+    return successResponse(
+      res,
+      null,
+      "Face registered successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Save face descriptor error:", error);
+    return errorResponse(
+      res,
+      error.message || "Failed to save face descriptor",
+      500
+    );
+  }
+};
+
